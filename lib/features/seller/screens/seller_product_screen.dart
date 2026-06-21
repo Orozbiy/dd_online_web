@@ -9,6 +9,7 @@ import '../../../core/app_localizations.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
+import '../screens/flash_sale_manage_screen.dart';
 
 class SellerProductScreen extends StatefulWidget {
   final String sellerUid;
@@ -380,14 +381,35 @@ Future<void> _loadProducts() async {
           Text(widget.shopName,
               style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
         ]),
+
+
         actions: [
+          // ⚡ Flash Sale — ЖАҢЫ КОШ
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const FlashSaleManageScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.bolt_rounded, color: Colors.orange),
+            tooltip: 'Flash Sale',
+          ),
+          // Учурдагы refresh (өзгөртүүсүз)
           IconButton(
             onPressed: _loadProducts,
             icon: Icon(Icons.refresh, color: isDark ? Colors.white70 : AppColors.grey600),
             tooltip: loc.get('refresh'),
           ),
         ],
+
+
+
       ),
+
+
+
+      
       body: Column(
         children: [
           // ── Категория фильтр ──

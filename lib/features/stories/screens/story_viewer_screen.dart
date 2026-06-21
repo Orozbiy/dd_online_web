@@ -1,4 +1,6 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui_web' as ui_web;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,8 @@ import '../models/story_model.dart';
 import '../services/story_service.dart';
 import '../widgets/story_progress_bar.dart';
 import '../widgets/story_like_button.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class StoryViewerScreen extends StatefulWidget {
   final List<StoryModel> stories;
@@ -32,20 +36,20 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   late AnimationController _progressCtrl;
   late Animation<double> _progressAnim;
 
-  // Сүрөт үчүн убакыт
-  static const int _imageDuration = 5;
-  // Видео узундугу белгисиз болгондо колдонулат
+  static const int _imageDuration        = 5;
   static const int _fallbackVideoDuration = 15;
 
-  bool _isPaused    = false;
+  bool _isPaused     = false;
   bool _isNavigating = false;
 
-  // ── Video player ──
+  // ── Mobile video player ──
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
-
-  // Видео узундугун listener менен күтөбүз
   Timer? _durationTimer;
+
+  // ── Web HTML video ──
+  html.VideoElement? _webVideo;
+  String _webViewId = '';
 
   @override
   void initState() {
@@ -70,11 +74,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progressCtrl.dispose();
     _durationTimer?.cancel();
     _disposeVideo();
+    _disposeWebVideo();
     super.dispose();
   }
 
   // ─────────────────────────────────────────────
-  // Video dispose
+  // Dispose
   // ─────────────────────────────────────────────
   void _disposeVideo() {
     _durationTimer?.cancel();
@@ -86,6 +91,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _videoReady = false;
   }
 
+  void _disposeWebVideo() {
+    _webVideo?.pause();
+    _webVideo?.src = '';
+    _webVideo = null;
+  }
+
   // ─────────────────────────────────────────────
   // Story баштоо
   // ─────────────────────────────────────────────
@@ -93,6 +104,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     if (index < 0 || index >= _stories.length) return;
 
     _disposeVideo();
+    _disposeWebVideo();
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
     _progressCtrl.reset();
@@ -100,7 +112,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     final story = _stories[index];
 
     if (story.isVideo) {
-      await _initVideo(story.mediaUrl);
+      if (kIsWeb) {
+        await _initWebVideo(story.mediaUrl);
+      } else {
+        await _initVideo(story.mediaUrl);
+      }
     } else {
       _progressCtrl.duration = const Duration(seconds: _imageDuration);
       _progressCtrl.forward();
@@ -109,29 +125,93 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   }
 
   // ─────────────────────────────────────────────
-  // Видео инициализация
+  // WEB: HTML <video> элементи
   // ─────────────────────────────────────────────
- Future<void> _initVideo(String url) async {
+  Future<void> _initWebVideo(String url) async {
+    debugPrint('🎬 Web видео URL: $url');
+
+    final viewId = 'story-video-${DateTime.now().millisecondsSinceEpoch}';
+    _webViewId   = viewId;
+
+    final video = html.VideoElement()
+      ..src        = url
+      ..autoplay   = true
+      ..controls   = false
+      ..style.width  = '100%'
+      ..style.height = '100%'
+      ..style.objectFit = 'contain'
+      ..style.backgroundColor = 'black'
+      ..setAttribute('playsinline', 'true')
+      ..setAttribute('crossorigin', 'anonymous');
+
+    _webVideo = video;
+
+    // View катары каттоо
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(
+      viewId,
+      (_) => video,
+    );
+
+    // Видео жүктөлгөндө прогресс баштоо
+    video.onCanPlay.listen((_) {
+      if (!mounted) return;
+      debugPrint('✅ Web видео ready, duration: ${video.duration}s');
+      setState(() {});
+
+      final dur = video.duration;
+      if (dur > 0 && dur.isFinite) {
+        _startProgressForVideo(
+          Duration(milliseconds: (dur * 1000).toInt()),
+        );
+      } else {
+        _startProgressForVideo(
+          const Duration(seconds: _fallbackVideoDuration),
+        );
+      }
+    });
+
+    // Видео бүткөндө кийинкиге өтүү
+    video.onEnded.listen((_) {
+      if (!mounted) return;
+      _goNext();
+    });
+
+    // Ката
+    video.onError.listen((_) {
+      debugPrint('❌ Web видео ката: ${video.error?.message}');
+      if (!mounted) return;
+      _startProgressForVideo(
+        const Duration(seconds: _fallbackVideoDuration),
+      );
+    });
+
+    if (mounted) setState(() {});
+  }
+
+  // ─────────────────────────────────────────────
+  // MOBILE: video_player
+  // ─────────────────────────────────────────────
+  Future<void> _initVideo(String url) async {
     try {
-      debugPrint('🎬 Видео URL: $url'); // ← кош
+      debugPrint('🎬 Mobile видео URL: $url');
       final ctrl = VideoPlayerController.networkUrl(
         Uri.parse(url),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        httpHeaders: kIsWeb ? {} : {'Cache-Control': 'max-age=604800'},
+        httpHeaders: {'Cache-Control': 'max-age=604800'},
       );
       _videoCtrl = ctrl;
 
       await ctrl.initialize();
-      debugPrint('✅ Видео initialize болду: ${ctrl.value.duration}'); // ← кош
+      debugPrint('✅ Mobile видео initialize: ${ctrl.value.duration}');
       if (!mounted) return;
 
       setState(() => _videoReady = true);
       ctrl.play();
       _waitForDurationAndStartProgress(ctrl);
-
       ctrl.addListener(_onVideoListener);
     } catch (e) {
-      debugPrint('❌ Video init error: $e'); // ← бул эмне дейт консолдо?
+      debugPrint('❌ Video init error: $e');
       if (mounted) {
         _progressCtrl.duration =
             const Duration(seconds: _fallbackVideoDuration);
@@ -141,16 +221,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     }
   }
 
-  // Duration'ды listener менен күтүү (веб үчүн маанилүү)
   void _waitForDurationAndStartProgress(VideoPlayerController ctrl) {
-    // Эгер дароо жеткиликтүү болсо
     final dur = ctrl.value.duration;
     if (dur.inMilliseconds > 500) {
       _startProgressForVideo(dur);
       return;
     }
 
-    // Болбосо 50ms сайын текшерип турабыз (максимум 5 сек)
     int attempts = 0;
     _durationTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
       if (!mounted) { t.cancel(); return; }
@@ -160,7 +237,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         t.cancel();
         _startProgressForVideo(d);
       } else if (attempts > 100) {
-        // 5 секунд күттүк, эч нерсе жок — fallback
         t.cancel();
         _startProgressForVideo(
             const Duration(seconds: _fallbackVideoDuration));
@@ -178,7 +254,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progressCtrl.addStatusListener(_onProgressStatus);
   }
 
-  // Видео listener — бүткөндү текшерет
   void _onVideoListener() {
     if (!mounted) return;
     final ctrl = _videoCtrl;
@@ -204,20 +279,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void _goNext() {
     if (_isNavigating) return;
     _isNavigating = true;
-
     _progressCtrl.removeStatusListener(_onProgressStatus);
 
     if (_currentIndex < _stories.length - 1) {
-      setState(() {
-        _currentIndex++;
-        _isNavigating = false;
-      });
+      setState(() { _currentIndex++; _isNavigating = false; });
       _startStory(_currentIndex);
     } else {
-      setState(() {
-        _currentIndex  = 0;
-        _isNavigating  = false;
-      });
+      setState(() { _currentIndex = 0; _isNavigating = false; });
       _startStory(0);
     }
   }
@@ -225,16 +293,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   void _goPrev() {
     if (_isNavigating) return;
     _progressCtrl.removeStatusListener(_onProgressStatus);
-    if (_currentIndex > 0) {
-      setState(() => _currentIndex--);
-    }
+    if (_currentIndex > 0) setState(() => _currentIndex--);
     _isNavigating = false;
     _startStory(_currentIndex);
   }
 
-  void _close() {
-    Navigator.of(context).pop(_stories);
-  }
+  void _close() => Navigator.of(context).pop(_stories);
 
   // ─────────────────────────────────────────────
   // Пауза / Resume
@@ -244,6 +308,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _durationTimer?.cancel();
     _progressCtrl.stop();
     _videoCtrl?.pause();
+    _webVideo?.pause();
     setState(() => _isPaused = true);
   }
 
@@ -251,6 +316,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     if (!_isPaused) return;
     _progressCtrl.forward();
     _videoCtrl?.play();
+    _webVideo?.play();
     setState(() => _isPaused = false);
   }
 
@@ -294,10 +360,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ── Медиа ──
             _buildMedia(story),
 
-            // ── Градиент жогору ──
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -308,7 +372,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
-            // ── Градиент төмөн ──
             const Positioned(
               bottom: 0, left: 0, right: 0,
               child: DecoratedBox(
@@ -323,7 +386,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
-            // ── Прогресс + жабуу ──
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -364,7 +426,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
-            // ── Лайк баскычы ──
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: SafeArea(
@@ -411,7 +472,28 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
 
-    // ── ВИДЕО жүктөлүп жатат ──
+    // ── WEB ВИДЕО ──
+    if (kIsWeb) {
+      if (_webViewId.isEmpty) {
+        return const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 12),
+              Text('Видео жүктөлүп жатат...',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+            ],
+          ),
+        );
+      }
+      return Container(
+        color: Colors.black,
+        child: HtmlElementView(viewType: _webViewId),
+      );
+    }
+
+    // ── MOBILE ВИДЕО жүктөлүп жатат ──
     if (!_videoReady || _videoCtrl == null ||
         !_videoCtrl!.value.isInitialized) {
       return const Center(
@@ -427,7 +509,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
 
-    // ── ВИДЕО — кат жок, туура пропорция ──
+    // ── MOBILE ВИДЕО ──
     return Container(
       color: Colors.black,
       child: Center(

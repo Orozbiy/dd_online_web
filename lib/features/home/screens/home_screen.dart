@@ -883,10 +883,16 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+
+
+
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
                         child: Row(
+
+                          
                           children: [
                             if (_isSearchMode && !_isLoading)
                               Text(

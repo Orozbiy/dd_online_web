@@ -394,6 +394,21 @@ class AppLocalizations {
     'cat_7_9': 'Сүзүү',
     'cat_7_10': 'Жүгүрүү',
 
+    'flash_sale_title': 'Тез арада жетишип кал!',
+    'flash_sale_subtitle': 'Убакыт чектелген супер баалар',
+    'flash_sale_empty': 'Азырынча Flash Sale жок',
+    'flash_sale_empty_sub': 'Кийинчерээк кайра кириңиз',
+    'flash_time_left': 'Акция бүтөөгө калган убакыт',
+    'flash_hours': 'саат',
+    'flash_minutes': 'мүнөт',
+    'flash_seconds': 'секунд',
+
+// 🏆 Leaderboard
+    'leaderboard_title': 'Топ алуучулар',
+    'leaderboard_my_rank': 'Сениң орнуң',
+    'leaderboard_orders': 'буюртма',
+    'leaderboard_pts': 'балл',
+
     // 8 (Балдар)
     'cat_8_1': 'Баары',
     'cat_8_2': 'Оюнчуктар',
@@ -647,6 +662,20 @@ class AppLocalizations {
     'price_watch_login': 'Необходимо войти!',
     'story_loading': 'Загрузка...',
     'story_empty': 'Новостей пока нет',
+    'flash_sale_title': 'Успей схватить!',
+    'flash_sale_subtitle': 'Супер цены — время ограничено',
+    'flash_sale_empty': 'Flash Sale пока нет',
+    'flash_sale_empty_sub': 'Заходите позже',
+    'flash_time_left': 'До конца акции осталось',
+    'flash_hours': 'часов',
+    'flash_minutes': 'минут',
+    'flash_seconds': 'секунд',
+
+// 🏆 Leaderboard
+    'leaderboard_title': 'Топ покупателей',
+    'leaderboard_my_rank': 'Ваше место',
+    'leaderboard_orders': 'заказов',
+    'leaderboard_pts': 'баллов',
     'story_add': 'Добавить новость',
     'story_image_gallery': '📷 Фото из галереи',
     'story_image_camera': '📸 Сфотографировать',
