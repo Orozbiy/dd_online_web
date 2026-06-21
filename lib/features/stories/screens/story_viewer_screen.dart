@@ -111,8 +111,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ─────────────────────────────────────────────
   // Видео инициализация
   // ─────────────────────────────────────────────
-  Future<void> _initVideo(String url) async {
+ Future<void> _initVideo(String url) async {
     try {
+      debugPrint('🎬 Видео URL: $url'); // ← кош
       final ctrl = VideoPlayerController.networkUrl(
         Uri.parse(url),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
@@ -121,19 +122,16 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       _videoCtrl = ctrl;
 
       await ctrl.initialize();
+      debugPrint('✅ Видео initialize болду: ${ctrl.value.duration}'); // ← кош
       if (!mounted) return;
 
       setState(() => _videoReady = true);
       ctrl.play();
-
-      // ── Видео узундугун туура окуу ──
-      // Веб'де initialize() бүткөндө duration нөл болуп калат,
-      // ошондуктан listener менен күтөбүз
       _waitForDurationAndStartProgress(ctrl);
 
       ctrl.addListener(_onVideoListener);
     } catch (e) {
-      debugPrint('❌ Video init error: $e');
+      debugPrint('❌ Video init error: $e'); // ← бул эмне дейт консолдо?
       if (mounted) {
         _progressCtrl.duration =
             const Duration(seconds: _fallbackVideoDuration);

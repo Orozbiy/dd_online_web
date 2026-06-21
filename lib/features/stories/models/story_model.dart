@@ -56,7 +56,7 @@ class StoryModel {
       isLikedByMe:  isLikedByMe  ?? this.isLikedByMe,
     );
   }
-
-  bool get isImage => mediaType == 'image';
   bool get isVideo => mediaType == 'video';
+  bool get isImage => mediaType == 'image';
+  
 }

@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../../core/supabase_client.dart';
 import '../models/story_model.dart';
 
@@ -10,9 +12,12 @@ class StoryService {
   StoryService._();
   static final StoryService instance = StoryService._();
 
-  static const _storiesTable   = 'stories';
-  static const _likesTable     = 'story_likes';
-  static const _storageBucket  = 'stories';
+  static const _storiesTable  = 'stories';
+  static const _likesTable    = 'story_likes';
+
+  // ── Cloudinary маалыматтары ──
+  static const _cloudName    = 'dedwm4krp';
+  static const _uploadPreset = 'dd-online';
 
   // ─────────────────────────────────────────────
   // Кардарлар үчүн: бардык активдүү stories'ти алуу
@@ -68,20 +73,12 @@ class StoryService {
   // ─────────────────────────────────────────────
   Future<StoryModel?> uploadAndCreateStory({
     required File file,
-    required String mediaType, // 'image' же 'video'
+    required String mediaType,
   }) async {
     try {
-      // 1. Файлды Storage'га жүктөө
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
-
-      await supabase.storage
-          .from(_storageBucket)
-          .upload(fileName, file);
-
-      final mediaUrl = supabase.storage
-          .from(_storageBucket)
-          .getPublicUrl(fileName);
+      // 1. Cloudinary'га жүктөө
+      final mediaUrl = await _uploadToCloudinary(file, mediaType);
+      if (mediaUrl == null) return null;
 
       // 2. DB'га жазуу
       final Map<String, dynamic> row = await supabase
@@ -96,6 +93,48 @@ class StoryService {
       return StoryModel.fromMap(row);
     } catch (e) {
       debugPrint('❌ StoryService.uploadAndCreateStory: $e');
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Cloudinary'га жүктөө (сүрөт же видео)
+  // ─────────────────────────────────────────────
+  Future<String?> _uploadToCloudinary(File file, String mediaType) async {
+    try {
+      final endpoint = mediaType == 'video' ? 'video' : 'image';
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$_cloudName/$endpoint/upload',
+      );
+
+      final ext = file.path.contains('.')
+          ? '.${file.path.split('.').last}'
+          : '';
+      final filename =
+          '${mediaType}_${DateTime.now().millisecondsSinceEpoch}$ext';
+
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['upload_preset'] = _uploadPreset
+        ..files.add(await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          filename: filename,
+        ));
+
+      final streamed = await request.send().timeout(
+        const Duration(minutes: 3),
+      );
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return data['secure_url'] as String?;
+      }
+      debugPrint(
+          '❌ Cloudinary ката: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ _uploadToCloudinary: $e');
       return null;
     }
   }
@@ -149,11 +188,12 @@ class StoryService {
   // ─────────────────────────────────────────────
   Future<({bool liked, int newCount})> toggleLike(StoryModel story) async {
     final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return (liked: story.isLikedByMe, newCount: story.likesCount);
+    if (userId == null) {
+      return (liked: story.isLikedByMe, newCount: story.likesCount);
+    }
 
     try {
       if (story.isLikedByMe) {
-        // Лайкты алып салуу
         await supabase
             .from(_likesTable)
             .delete()
@@ -168,7 +208,6 @@ class StoryService {
 
         return (liked: false, newCount: newCount);
       } else {
-        // Лайк кошуу
         await supabase.from(_likesTable).insert({
           'story_id': story.id,
           'user_id':  userId,
