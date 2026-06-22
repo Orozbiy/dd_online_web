@@ -107,14 +107,14 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     {'name': 'Темно-көк',    'hex': 0xFF00008B},
   ];
 
- @override
-void initState() {
-  super.initState();
-  _allCategories = CategoryModel.getCategories();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted) _loadProducts();
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    _allCategories = CategoryModel.getCategories();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadProducts();
+    });
+  }
 
   Future<String> _getOrCreateStoreId() async {
     if (_storeId != null) return _storeId!;
@@ -126,30 +126,31 @@ void initState() {
     return _storeId!;
   }
 
-Future<void> _loadProducts() async {
-  if (!mounted) return;
-  setState(() => _isLoading = true);
-  try {
-    final storeId = await _getOrCreateStoreId();
+  Future<void> _loadProducts() async {
     if (!mounted) return;
-    final rows = await supabase
-        .from('products')
-        .select()
-        .eq('store_id', storeId)
-        .order('created_at', ascending: false);
-    if (!mounted) return;
-    setState(() {
-      _products = (rows as List)
-          .map((r) => Map<String, dynamic>.from(r as Map))
-          .toList();
-      _isLoading = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    _showSnack('Жүктөөдө ката: $e', isError: true);
+    setState(() => _isLoading = true);
+    try {
+      final storeId = await _getOrCreateStoreId();
+      if (!mounted) return;
+      final rows = await supabase
+          .from('products')
+          .select()
+          .eq('store_id', storeId)
+          .order('created_at', ascending: false);
+      if (!mounted) return;
+      setState(() {
+        _products = (rows as List)
+            .map((r) => Map<String, dynamic>.from(r as Map))
+            .toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnack('Жүктөөдө ката: $e', isError: true);
+    }
   }
-}
+
   Future<String?> _uploadToCloudinary(Uint8List bytes) async {
     final loc = AppLocalizations.of(context);
     try {
@@ -207,11 +208,48 @@ Future<void> _loadProducts() async {
     }
   }
 
+  // ── ⭐ Өзгөчө белгилөө ──
+  Future<void> _toggleFeatured(Map<String, dynamic> product) async {
+    final id         = product['id'] as String;
+    final isFeatured = product['is_featured'] == true;
+    final newValue   = !isFeatured;
+    try {
+      await supabase
+          .from('products')
+          .update({'is_featured': newValue})
+          .eq('id', id);
+      setState(() {
+        final idx = _products.indexWhere((p) => p['id'] == id);
+        if (idx != -1) _products[idx]['is_featured'] = newValue;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newValue
+                ? '⭐ Өзгөчө товарларга кошулду!'
+                : '✖ Өзгөчө товарлардан алынды'),
+            backgroundColor: newValue ? const Color(0xFF7C3AED) : AppColors.grey500,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ката чыкты: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   void _showDiscountSheet(Map<String, dynamic> product) {
-    final loc   = AppLocalizations.of(context);
+    final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
-    final ctrl  = TextEditingController(text: (product['discount_percent'] as num?)?.toString() ?? '');
+    final price  = (product['price'] as num?)?.toDouble() ?? 0;
+    final ctrl   = TextEditingController(text: (product['discount_percent'] as num?)?.toString() ?? '');
     double? discountedPrice;
     int percent = int.tryParse(ctrl.text) ?? 0;
 
@@ -330,7 +368,12 @@ Future<void> _loadProducts() async {
     );
   }
 
-  Future<void> _saveDiscount({required String productId, required Map<String, dynamic> product, required int percent, required double discountedPrice}) async {
+  Future<void> _saveDiscount({
+    required String productId,
+    required Map<String, dynamic> product,
+    required int percent,
+    required double discountedPrice,
+  }) async {
     final loc = AppLocalizations.of(context);
     await supabase.from('products').update(
         {'discount_percent': percent, 'discounted_price': discountedPrice, 'has_promotion': true})
@@ -361,13 +404,13 @@ Future<void> _loadProducts() async {
     final filtered = _filteredProducts;
     final usedMainCatIds = _products.map((p) => (p['category_id'] as String? ?? '').split('_')[0]).toSet();
 
-    final bgColor      = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
-    final appBarColor  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor   = isDark ? Colors.white : AppColors.black;
-    final catBarColor  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final cardColor    = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final bgColor       = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
+    final appBarColor   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor    = isDark ? Colors.white : AppColors.black;
+    final catBarColor   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final cardColor     = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final prodNameColor = isDark ? Colors.white : AppColors.black;
-    final divColor     = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
+    final divColor      = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -381,35 +424,22 @@ Future<void> _loadProducts() async {
           Text(widget.shopName,
               style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
         ]),
-
-
         actions: [
-          // ⚡ Flash Sale — ЖАҢЫ КОШ
           IconButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const FlashSaleManageScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const FlashSaleManageScreen()),
             ),
             icon: const Icon(Icons.bolt_rounded, color: Colors.orange),
             tooltip: 'Flash Sale',
           ),
-          // Учурдагы refresh (өзгөртүүсүз)
           IconButton(
             onPressed: _loadProducts,
             icon: Icon(Icons.refresh, color: isDark ? Colors.white70 : AppColors.grey600),
             tooltip: loc.get('refresh'),
           ),
         ],
-
-
-
       ),
-
-
-
-      
       body: Column(
         children: [
           // ── Категория фильтр ──
@@ -480,93 +510,125 @@ Future<void> _loadProducts() async {
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
                               ),
-                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                // Сүрөт
-                                GestureDetector(
-                                  onTap: () => _showDiscountSheet(p),
-                                  child: Stack(children: [
-                                    SizedBox(
-                                      width: 80, height: 80,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: imageUrl.isNotEmpty
-                                            ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _noImage(isDark))
-                                            : _noImage(isDark),
-                                      ),
-                                    ),
-                                    if ((p['discount_percent'] as num? ?? 0) > 0)
-                                      Positioned(top: 2, left: 2,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
-                                          child: Text('-${p['discount_percent']}%',
-                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              // ── Row ТУУРА ЖАБЫЛДЫ ──
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Сүрөт
+                                  GestureDetector(
+                                    onTap: () => _showDiscountSheet(p),
+                                    child: Stack(children: [
+                                      SizedBox(
+                                        width: 80, height: 80,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: imageUrl.isNotEmpty
+                                              ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _noImage(isDark))
+                                              : _noImage(isDark),
                                         ),
                                       ),
+                                      if ((p['discount_percent'] as num? ?? 0) > 0)
+                                        Positioned(top: 2, left: 2,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                            decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
+                                            child: Text('-${p['discount_percent']}%',
+                                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                    ]),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Маалымат
+                                  Expanded(
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text(p['title'] as String? ?? '',
+                                          style: AppTextStyles.labelLarge.copyWith(color: prodNameColor),
+                                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 4),
+                                      Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? 0} ${loc.get('currency')}',
+                                          style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                                      const SizedBox(height: 2),
+                                      Text(_getCategoryName(p['category_id'] as String? ?? ''),
+                                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${loc.get('banner_stock_label')}: ${p['in_stock'] ?? 0} ${loc.get('pcs')}',
+                                        style: AppTextStyles.labelSmall.copyWith(
+                                          color: (p['in_stock'] as int? ?? 0) > 0 ? AppColors.success : AppColors.error,
+                                        ),
+                                      ),
+                                      if (colors.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Row(children: colors.take(5).map((name) {
+                                          final c = _allColors.firstWhere((x) => x['name'] == name, orElse: () => {'hex': 0xFF888888});
+                                          return Container(
+                                            width: 14, height: 14,
+                                            margin: const EdgeInsets.only(right: 4),
+                                            decoration: BoxDecoration(color: Color(c['hex'] as int), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withValues(alpha: 0.3))),
+                                          );
+                                        }).toList()),
+                                      ],
+                                      if (sizes.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${loc.get('size_label')}: ${sizes.take(3).join(', ')}${sizes.length > 3 ? ' +${sizes.length - 3}' : ''}',
+                                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ]),
+                                  ),
+
+                                  // ── Өзгөртүү / ⭐ / Өчүрүү ──
+                                  Column(children: [
+                                    // ✏️ Өзгөртүү
+                                    GestureDetector(
+                                      onTap: () => _showProductDialog(existing: p),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(8)),
+                                        child: const Icon(Icons.edit, size: 18, color: Color(0xFF0369A1)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // ⭐ Өзгөчө белгилөө
+                                    GestureDetector(
+                                      onTap: () => _toggleFeatured(p),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: p['is_featured'] == true
+                                              ? const Color(0xFFF3E8FF)
+                                              : const Color(0xFFF5F5F5),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Icon(
+                                          p['is_featured'] == true
+                                              ? Icons.star_rounded
+                                              : Icons.star_outline_rounded,
+                                          size: 18,
+                                          color: p['is_featured'] == true
+                                              ? const Color(0xFF7C3AED)
+                                              : AppColors.grey400,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // 🗑️ Өчүрүү
+                                    GestureDetector(
+                                      onTap: () => _deleteProduct(p['id'] as String? ?? '', p['title'] as String? ?? ''),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(color: const Color(0xFFFFEEEE), borderRadius: BorderRadius.circular(8)),
+                                        child: const Icon(Icons.delete, size: 18, color: AppColors.error),
+                                      ),
+                                    ),
                                   ]),
-                                ),
-                                const SizedBox(width: 12),
-
-                                // Маалымат
-                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text(p['title'] as String? ?? '',
-                                      style: AppTextStyles.labelLarge.copyWith(color: prodNameColor),
-                                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 4),
-                                  Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? 0} ${loc.get('currency')}',
-                                      style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
-                                  const SizedBox(height: 2),
-                                  Text(_getCategoryName(p['category_id'] as String? ?? ''),
-                                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${loc.get('banner_stock_label')}: ${p['in_stock'] ?? 0} ${loc.get('pcs')}',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: (p['in_stock'] as int? ?? 0) > 0 ? AppColors.success : AppColors.error,
-                                    ),
-                                  ),
-                                  if (colors.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Row(children: colors.take(5).map((name) {
-                                      final c = _allColors.firstWhere((x) => x['name'] == name, orElse: () => {'hex': 0xFF888888});
-                                      return Container(
-                                        width: 14, height: 14,
-                                        margin: const EdgeInsets.only(right: 4),
-                                        decoration: BoxDecoration(color: Color(c['hex'] as int), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withValues(alpha: 0.3))),
-                                      );
-                                    }).toList()),
-                                  ],
-                                  if (sizes.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${loc.get('size_label')}: ${sizes.take(3).join(', ')}${sizes.length > 3 ? ' +${sizes.length - 3}' : ''}',
-                                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ])),
-
-                                // Өзгөртүү / Өчүрүү
-                                Column(children: [
-                                  GestureDetector(
-                                    onTap: () => _showProductDialog(existing: p),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(8)),
-                                      child: const Icon(Icons.edit, size: 18, color: Color(0xFF0369A1)),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  GestureDetector(
-                                    onTap: () => _deleteProduct(p['id'] as String? ?? '', p['title'] as String? ?? ''),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(color: const Color(0xFFFFEEEE), borderRadius: BorderRadius.circular(8)),
-                                      child: const Icon(Icons.delete, size: 18, color: AppColors.error),
-                                    ),
-                                  ),
-                                ]),
-                              ]),
+                                  // ── Row children жабылды ──
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -652,7 +714,6 @@ Future<void> _loadProducts() async {
     bool isLoading     = false;
     String uploadStatus = '';
 
-    // ── Диалог түстөрү ──
     final dialogBg  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final fieldFill = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
     final textColor = isDark ? Colors.white : AppColors.black;
@@ -694,11 +755,11 @@ Future<void> _loadProducts() async {
       }
     }
 
-    bool hasSizes(String mainId)       => ['1', '2', '14'].contains(mainId);
-    bool hasColors(String mainId)      => ['1', '2', '3', '7', '8', '9', '14'].contains(mainId);
-    bool hasTechFields(String mainId)  => ['4', '6'].contains(mainId);
-    bool hasBeautyFields(String mainId)=> ['9', '10'].contains(mainId);
-    bool hasAutoFields(String mainId)  => mainId == '12';
+    bool hasSizes(String mainId)        => ['1', '2', '14'].contains(mainId);
+    bool hasColors(String mainId)       => ['1', '2', '3', '7', '8', '9', '14'].contains(mainId);
+    bool hasTechFields(String mainId)   => ['4', '6'].contains(mainId);
+    bool hasBeautyFields(String mainId) => ['9', '10'].contains(mainId);
+    bool hasAutoFields(String mainId)   => mainId == '12';
 
     Future<void> pickImage(StateSetter setD) async {
       final source = await showModalBottomSheet<ImageSource>(
@@ -711,14 +772,12 @@ Future<void> _loadProducts() async {
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-            title: Text('📷  ${loc.get('prod_img_camera')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+            title: Text('📷  ${loc.get('prod_img_camera')}', style: AppTextStyles.labelLarge.copyWith(color: textColor)),
             onTap: () => Navigator.pop(ctx, ImageSource.camera),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-            title: Text('🖼️  ${loc.get('prod_img_gallery')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+            title: Text('🖼️  ${loc.get('prod_img_gallery')}', style: AppTextStyles.labelLarge.copyWith(color: textColor)),
             onTap: () => Navigator.pop(ctx, ImageSource.gallery),
           ),
           const SizedBox(height: 8),
@@ -767,7 +826,6 @@ Future<void> _loadProducts() async {
             child: Container(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92, maxWidth: 520),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                // ── Башлык ──
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: const BoxDecoration(
@@ -783,12 +841,9 @@ Future<void> _loadProducts() async {
                     GestureDetector(onTap: () { if (!isLoading) Navigator.pop(ctx); }, child: const Icon(Icons.close, color: Colors.white)),
                   ]),
                 ),
-
-                // ── Форма ──
                 Flexible(child: SingleChildScrollView(
                   padding: const EdgeInsets.all(18),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    // 1. СҮРӨТ
                     labelW(loc.get('prod_field_image')),
                     GestureDetector(
                       onTap: () => pickImage(setD),
@@ -816,18 +871,12 @@ Future<void> _loadProducts() async {
                       Text(uploadStatus, style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                     ],
                     const SizedBox(height: 14),
-
-                    // 2. АТЫ
                     labelW(loc.get('prod_field_name')),
                     fieldW(nameCtrl, loc.get('prod_hint_name')),
                     const SizedBox(height: 14),
-
-                    // 3. БААСЫ
                     labelW(loc.get('prod_field_price')),
                     fieldW(priceCtrl, loc.get('prod_hint_price'), type: TextInputType.number),
                     const SizedBox(height: 14),
-
-                    // 4. НЕГИЗГИ КАТЕГОРИЯ
                     labelW(loc.get('prod_field_main_cat')),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -844,8 +893,6 @@ Future<void> _loadProducts() async {
                       )),
                     ),
                     const SizedBox(height: 14),
-
-                    // 5. КИЧИ КАТЕГОРИЯ
                     labelW(loc.get('prod_field_sub_cat')),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -877,19 +924,16 @@ Future<void> _loadProducts() async {
                       ]),
                     ),
                     const SizedBox(height: 14),
-
                     if (hasColors(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_colors')),
                       _colorPicker(selectedColors, setD, isDark),
                       const SizedBox(height: 14),
                     ],
-
                     if (hasSizes(selectedMainCatId)) ...[
                       labelW(sizeLabelForCategory(selectedMainCatId, selectedSubCatId)),
                       _sizePicker(sizesForCategory(selectedMainCatId, selectedSubCatId), selectedSizes, setD, isDark),
                       const SizedBox(height: 14),
                     ],
-
                     if (hasTechFields(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_brand')), fieldW(extra1Ctrl, loc.get('prod_hint_brand_tech')), const SizedBox(height: 14),
                       labelW(loc.get('prod_field_model')), fieldW(extra2Ctrl, loc.get('prod_hint_model')), const SizedBox(height: 14),
@@ -900,14 +944,12 @@ Future<void> _loadProducts() async {
                       labelW(loc.get('prod_field_volume')), fieldW(extra2Ctrl, loc.get('prod_hint_volume')),       const SizedBox(height: 14),
                     ],
                     if (hasAutoFields(selectedMainCatId)) ...[
-                      labelW(loc.get('prod_field_brand')),       fieldW(extra1Ctrl, loc.get('prod_hint_brand_auto')),  const SizedBox(height: 14),
-                      labelW(loc.get('prod_field_car_compat')),  fieldW(extra2Ctrl, loc.get('prod_hint_car_compat')), const SizedBox(height: 14),
+                      labelW(loc.get('prod_field_brand')),      fieldW(extra1Ctrl, loc.get('prod_hint_brand_auto')),  const SizedBox(height: 14),
+                      labelW(loc.get('prod_field_car_compat')), fieldW(extra2Ctrl, loc.get('prod_hint_car_compat')), const SizedBox(height: 14),
                     ],
-
                     labelW(loc.get('prod_field_stock')),
                     fieldW(stockCtrl, loc.get('prod_hint_stock'), type: TextInputType.number),
                     const SizedBox(height: 14),
-
                     labelW(loc.get('prod_field_desc')),
                     TextField(controller: descCtrl, maxLines: 3,
                         style: AppTextStyles.bodyMedium.copyWith(color: textColor),
@@ -919,7 +961,6 @@ Future<void> _loadProducts() async {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                         )),
-
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -935,31 +976,31 @@ Future<void> _loadProducts() async {
                       ]),
                     ),
                     const SizedBox(height: 18),
-
-                    // ── САКТОО ──
                     SizedBox(
                       width: double.infinity, height: 52,
                       child: ElevatedButton(
                         onPressed: isLoading ? null : () async {
                           final name  = nameCtrl.text.trim();
                           final price = double.tryParse(priceCtrl.text.trim());
-                          if (name.isEmpty)                              { _showSnack(loc.get('prod_err_name'),  isError: true); return; }
-                          if (price == null || price <= 0)               { _showSnack(loc.get('prod_err_price'), isError: true); return; }
+                          if (name.isEmpty)                                   { _showSnack(loc.get('prod_err_name'),  isError: true); return; }
+                          if (price == null || price <= 0)                    { _showSnack(loc.get('prod_err_price'), isError: true); return; }
                           if (imageBytes == null && existingImageUrl.isEmpty) { _showSnack(loc.get('prod_err_image'), isError: true); return; }
-
                           setD(() { isLoading = true; uploadStatus = ''; });
                           try {
                             String imageUrl = existingImageUrl;
                             if (imageBytes != null) {
                               setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
-                              final compressed = await compressImage(imageBytes!);
-                              final uploaded   = await _uploadToCloudinary(compressed);
+
+
+                            final compressed  = await compressImage(imageBytes!);
+final watermarked = await addWatermark(compressed);   // ← жаңы сап
+final uploaded    = await _uploadToCloudinary(watermarked);
+
                               if (uploaded == null) { setD(() { isLoading = false; isUploading = false; uploadStatus = ''; }); return; }
                               imageUrl = uploaded;
                               setD(() { isUploading = false; uploadStatus = loc.get('prod_uploaded'); });
                             }
                             setD(() => uploadStatus = loc.get('prod_saving'));
-
                             final storeId    = await _getOrCreateStoreId();
                             final finalCatId = selectedSubCatId ?? selectedMainCatId;
                             final data = {
@@ -969,13 +1010,11 @@ Future<void> _loadProducts() async {
                               'extra1': extra1Ctrl.text.trim(), 'extra2': extra2Ctrl.text.trim(), 'extra3': extra3Ctrl.text.trim(),
                               'rating': existing?['rating'] ?? 0.0,
                             };
-
                             if (existing != null) {
                               await supabase.from('products').update(data).eq('id', existing['id'] as String);
                             } else {
                               await supabase.from('products').insert(data);
                             }
-
                             if (ctx.mounted) Navigator.pop(ctx);
                             _showSnack(existing == null ? loc.get('prod_added') : loc.get('prod_updated'));
                             _loadProducts();

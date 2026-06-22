@@ -1,13 +1,14 @@
+// lib/features/stories/models/story_model.dart
+
 class StoryModel {
   final String id;
   final String mediaUrl;
-  final String mediaType; // 'image' же 'video'
+  final String mediaType;
   final int likesCount;
   final bool isActive;
   final DateTime createdAt;
-
-  // Локалдык state — учурдагы колдонуучу жакыртканбы?
   final bool isLikedByMe;
+  final bool isViewed;
 
   const StoryModel({
     required this.id,
@@ -17,6 +18,7 @@ class StoryModel {
     required this.isActive,
     required this.createdAt,
     this.isLikedByMe = false,
+    this.isViewed = false,
   });
 
   factory StoryModel.fromMap(Map<String, dynamic> map) {
@@ -27,6 +29,7 @@ class StoryModel {
       likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
       isActive:   map['is_active']  as bool? ?? true,
       createdAt:  DateTime.parse(map['created_at'] as String),
+      // isViewed SharedPreferences'тен келет, fromMap'та жок
     );
   }
 
@@ -45,18 +48,20 @@ class StoryModel {
     bool?     isActive,
     DateTime? createdAt,
     bool?     isLikedByMe,
+    bool?     isViewed,
   }) {
     return StoryModel(
-      id:           id           ?? this.id,
-      mediaUrl:     mediaUrl     ?? this.mediaUrl,
-      mediaType:    mediaType    ?? this.mediaType,
-      likesCount:   likesCount   ?? this.likesCount,
-      isActive:     isActive     ?? this.isActive,
-      createdAt:    createdAt    ?? this.createdAt,
-      isLikedByMe:  isLikedByMe  ?? this.isLikedByMe,
+      id:          id          ?? this.id,
+      mediaUrl:    mediaUrl    ?? this.mediaUrl,
+      mediaType:   mediaType   ?? this.mediaType,
+      likesCount:  likesCount  ?? this.likesCount,
+      isActive:    isActive    ?? this.isActive,
+      createdAt:   createdAt   ?? this.createdAt,
+      isLikedByMe: isLikedByMe ?? this.isLikedByMe,
+      isViewed:    isViewed    ?? this.isViewed,
     );
   }
-  bool get isVideo => mediaType == 'video';
+
   bool get isImage => mediaType == 'image';
-  
+  bool get isVideo => mediaType == 'video';
 }

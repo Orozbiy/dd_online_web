@@ -7,7 +7,10 @@ import '../../stories/screens/story_viewer_screen.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
-import '../screens/flash_sale_screen.dart'; // ← сатып алуучу үчүн
+import '../screens/flash_sale_screen.dart';
+import '../../featured/screens/featured_screen.dart';
+import '../../featured/roulette/screens/roulette_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppEndDrawer extends StatefulWidget {
   const AppEndDrawer({super.key});
@@ -19,6 +22,7 @@ class AppEndDrawer extends StatefulWidget {
 class _AppEndDrawerState extends State<AppEndDrawer> {
   List<StoryModel> _stories = [];
   bool _loading = true;
+  Set<String> _viewedIds = {};
 
   @override
   void initState() {
@@ -27,10 +31,15 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
   }
 
   Future<void> _loadStories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('viewed_story_ids') ?? [];
     final list = await StoryService.instance.fetchActiveStories();
     if (mounted) {
       setState(() {
-        _stories = list;
+        _viewedIds = ids.toSet();
+        _stories = list
+            .map((s) => s.copyWith(isViewed: _viewedIds.contains(s.id)))
+            .toList();
         _loading = false;
       });
     }
@@ -41,7 +50,7 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
 
-    final result = await Navigator.push<List<StoryModel>>(
+    await Navigator.push<List<StoryModel>>(
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => StoryViewerScreen(
@@ -54,9 +63,15 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
       ),
     );
 
-    if (result != null && mounted) {
-      setState(() => _stories = result);
-    }
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('viewed_story_ids') ?? [];
+    setState(() {
+      _viewedIds = ids.toSet();
+      _stories = _stories
+          .map((s) => s.copyWith(isViewed: _viewedIds.contains(s.id)))
+          .toList();
+    });
   }
 
   @override
@@ -127,7 +142,7 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
             Divider(height: 1, color: dividerColor),
             const SizedBox(height: 20),
 
-            // ── 🎁 Акциялар Card ── (өзгөртүүсүз)
+            // ── 🎁 Акциялар Card ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
@@ -184,7 +199,7 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
               ),
             ),
 
-            // ── ⚡ Flash Sale Card ── ЖАҢЫ (сатып алуучу үчүн)
+            // ── ⚡ Flash Sale Card ──
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -217,33 +232,187 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
                           offset: const Offset(0, 4))
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Text('⚡', style: TextStyle(fontSize: 32)),
-                      SizedBox(width: 14),
+                      const Text('⚡', style: TextStyle(fontSize: 32)),
+                      const SizedBox(width: 14),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Тез арада жетишип кал!',
-                            style: TextStyle(
+                            loc.get('drawer_flash_title'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            'Убакыт чектелген супер баалар',
-                            style: TextStyle(
+                            loc.get('drawer_flash_subtitle'),
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                      Spacer(),
-                      Icon(Icons.arrow_forward_ios_rounded,
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          color: Colors.white, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── ⭐ Өзгөчө товарлар Card ──
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GestureDetector(
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await Future.delayed(const Duration(milliseconds: 150));
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const FeaturedScreen()),
+                    );
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF9F67FA)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('⭐', style: TextStyle(fontSize: 32)),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            loc.get('drawer_featured_title'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            loc.get('drawer_featured_subtitle'),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          color: Colors.white, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── 🎰 Күнүмдүк Рулетка Card ──
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GestureDetector(
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await Future.delayed(const Duration(milliseconds: 150));
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const RouletteScreen()),
+                    );
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0EA5E9), Color(0xFF38BDF8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('🎰', style: TextStyle(fontSize: 32)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.get('drawer_roulette_title'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              loc.get('drawer_roulette_subtitle'),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // ── "ЖАҢЫ" badge ──
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'ЖАҢЫ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_ios_rounded,
                           color: Colors.white, size: 20),
                     ],
                   ),
@@ -257,7 +426,7 @@ class _AppEndDrawerState extends State<AppEndDrawer> {
             Padding(
               padding: const EdgeInsets.all(20),
               child: Text(
-                'Дордой Базары',
+                loc.get('drawer_footer'),
                 style: AppTextStyles.labelSmall.copyWith(
                   color: isDark ? AppColors.grey500 : null,
                 ),
