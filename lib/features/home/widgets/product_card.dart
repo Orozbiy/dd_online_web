@@ -210,8 +210,8 @@ class _ProductCardState extends State<ProductCard>
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                               color: textColor,
                               height: 1.3,
                             ),
@@ -222,7 +222,7 @@ class _ProductCardState extends State<ProductCard>
                             Text(
                               '${widget.product.discountedPrice!.toStringAsFixed(0)} сом',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 19,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.error,
                               ),
