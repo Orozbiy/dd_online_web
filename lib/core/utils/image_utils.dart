@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
@@ -10,6 +11,9 @@ Future<Uint8List> compressImage(
   int maxWidth = 800,
   int maxHeight = 800,
 }) async {
+  // Веб платформада flutter_image_compress иштебейт
+  if (kIsWeb) return bytes;
+
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth: maxWidth,
@@ -23,6 +27,7 @@ Future<Uint8List> compressImage(
 
 /// Чат сүрөттөрү үчүн
 Future<Uint8List> compressChatImage(Uint8List bytes) async {
+  if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
     bytes,
     minWidth: 800,
@@ -34,6 +39,7 @@ Future<Uint8List> compressChatImage(Uint8List bytes) async {
 
 /// Story сүрөттөрү үчүн
 Future<Uint8List> compressStoryImage(Uint8List bytes) async {
+  if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
     bytes,
     minWidth: 1080,
@@ -44,15 +50,16 @@ Future<Uint8List> compressStoryImage(Uint8List bytes) async {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// WATERMARK — dart:ui, сервер жок
-// ─────────────────────────────────────────────────────────────
-
-/// Товар сүрөтүнө "DD Online" watermark кош (ылдый ортосунда)
+/// Товар сүрөтүнө "DD Online" watermark кош
 Future<Uint8List> addWatermark(Uint8List bytes) async {
+  // Веб платформада watermark өткөрүп жиберебиз
+  if (kIsWeb) return bytes;
+
   final codec  = await ui.instantiateImageCodec(bytes);
   final frame  = await codec.getNextFrame();
   final src    = frame.image;
+
+  // ... калган код өзгөрбөйт
 
   try {
     final w = src.width.toDouble();

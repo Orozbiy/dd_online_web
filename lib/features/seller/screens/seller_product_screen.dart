@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../config/theme/app_colors.dart';
@@ -10,7 +11,8 @@ import '../../../core/utils/image_utils.dart';
 import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
 import '../screens/flash_sale_manage_screen.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import '../../../core/utils/image_picker_helper.dart'; // 
 
 class SellerProductScreen extends StatefulWidget {
   final String sellerUid;
@@ -764,21 +766,19 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
 
 
 
-    Future<void> pickImage(StateSetter setD) async {
+
+
+Future<void> pickImage(StateSetter setD) async {
   try {
-    final picker = ImagePicker();
-    
     if (kIsWeb) {
-      // Веб платформада: түздөн-түз gallery (файл тандагыч)
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked != null) {
-        final bytes = await picked.readAsBytes();
+      final bytes = await pickWebImage();
+      if (bytes != null && bytes.isNotEmpty) {
         setD(() => imageBytes = bytes);
       }
       return;
     }
 
-    // Мобилде: камера же галерея тандоо
+    // Мобил апп үчүн: камера же галерея
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: dialogBg,
@@ -788,8 +788,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
         const SizedBox(height: 8),
         Container(
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             decoration: BoxDecoration(
                 color: AppColors.grey300,
                 borderRadius: BorderRadius.circular(2))),
@@ -810,6 +809,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
       ])),
     );
     if (source == null) return;
+    final picker = ImagePicker();
     final picked = await picker.pickImage(source: source);
     if (picked != null) {
       final bytes = await picked.readAsBytes();
