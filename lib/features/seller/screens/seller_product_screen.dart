@@ -10,6 +10,7 @@ import '../../../core/utils/image_utils.dart';
 import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
 import '../screens/flash_sale_manage_screen.dart';
+import 'package:flutter/foundation.dart';
 
 class SellerProductScreen extends StatefulWidget {
   final String sellerUid;
@@ -761,37 +762,63 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     bool hasBeautyFields(String mainId) => ['9', '10'].contains(mainId);
     bool hasAutoFields(String mainId)   => mainId == '12';
 
+
+
     Future<void> pickImage(StateSetter setD) async {
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        backgroundColor: dialogBg,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 8),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-            title: Text('📷  ${loc.get('prod_img_camera')}', style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () => Navigator.pop(ctx, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-            title: Text('🖼️  ${loc.get('prod_img_gallery')}', style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ])),
-      );
-      if (source == null) return;
-      try {
-        final picker = ImagePicker();
-        final picked = await picker.pickImage(source: source);
-        if (picked != null) { final bytes = await picked.readAsBytes(); setD(() => imageBytes = bytes); }
-      } catch (e) {
-        _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+  try {
+    final picker = ImagePicker();
+    
+    if (kIsWeb) {
+      // Веб платформада: түздөн-түз gallery (файл тандагыч)
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        setD(() => imageBytes = bytes);
       }
+      return;
     }
+
+    // Мобилде: камера же галерея тандоо
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: dialogBg,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 8),
+        Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: AppColors.grey300,
+                borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 12),
+        ListTile(
+          leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+          title: Text('📷  ${loc.get('prod_img_camera')}',
+              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+          onTap: () => Navigator.pop(ctx, ImageSource.camera),
+        ),
+        ListTile(
+          leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+          title: Text('🖼️  ${loc.get('prod_img_gallery')}',
+              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+          onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+        ),
+        const SizedBox(height: 8),
+      ])),
+    );
+    if (source == null) return;
+    final picked = await picker.pickImage(source: source);
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      setD(() => imageBytes = bytes);
+    }
+  } catch (e) {
+    _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+  }
+}
 
     await showDialog(
       context: context,
