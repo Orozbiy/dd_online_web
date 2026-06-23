@@ -22,7 +22,20 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   final _phoneCtrl           = TextEditingController();
   final _passwordCtrl        = TextEditingController();
   final _passwordConfirmCtrl = TextEditingController();
+  
+  String _storeType   = 'market'; // 'market' | 'private'
+  String? _marketName = 'Дордой базары';
 
+  static const List<String> _markets = [
+    'Дордой базары',
+    'Ош базары',
+    'Азиз базары',
+    'Мадина базары',
+    'Орто-Сай базары',
+    'Аламүдүн базары',
+    'Кара-Суу базары',
+    'Птичий рынок',
+  ];
   bool _obscure1  = true;
   bool _obscure2  = true;
   bool _isLoading = false;
@@ -64,6 +77,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     if (name.isEmpty) { _showSnack(loc.get('reg_err_name')); return; }
     final age = int.tryParse(ageText);
     if (age == null || age < 14 || age > 100) { _showSnack(loc.get('reg_err_age')); return; }
+    if (_storeType == 'market' && (_marketName == null || _marketName!.isEmpty)) {
+      _showSnack('Рынок тандаңыз'); return;
+    }
     if (shopName.isEmpty && containerNumber.isEmpty) { _showSnack(loc.get('reg_err_container')); return; }
     if (localPhone.length < 9) { _showSnack(loc.get('reg_err_phone')); return; }
 
@@ -79,8 +95,10 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         password: password,
         fullName: name,
         age: age,
-        containerNumber: containerNumber,
+       containerNumber: containerNumber,
         shopName: shopName,
+        storeType: _storeType,
+        marketName: _storeType == 'market' ? _marketName : null,
       );
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -216,6 +234,101 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 decoration: _decoration(context, hint: loc.get('reg_hint_shop')),
               ),
               const SizedBox(height: 20),
+
+
+
+              // ── ДҮКӨН ТҮРҮ ──
+              _label(context, 'Дүкөн түрүңүздү тандаңыз'),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _storeType = 'market';
+                        _marketName = 'Дордой базары';
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _storeType == 'market'
+                              ? AppColors.primary
+                              : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('🏪', style: TextStyle(fontSize: 24)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Рынок/Базар',
+                              style: AppTextStyles.labelLarge.copyWith(
+                                color: _storeType == 'market' ? Colors.white : textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _storeType = 'private';
+                        _marketName = null;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _storeType == 'private'
+                              ? AppColors.primary
+                              : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('🏬', style: TextStyle(fontSize: 24)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Жеке дүкөн',
+                              style: AppTextStyles.labelLarge.copyWith(
+                                color: _storeType == 'private' ? Colors.white : textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // ── РЫНОК ТАНДОО (market болсо гана) ──
+              if (_storeType == 'market') ...[
+                _label(context, 'Рынок тандаңыз'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _marketName,
+                      isExpanded: true,
+                      dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                      style: AppTextStyles.bodyMedium.copyWith(color: textColor),
+                      items: _markets.map((m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(m),
+                      )).toList(),
+                      onChanged: (val) => setState(() => _marketName = val),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // ── ТЕЛЕФОН ──
               _label(context, loc.get('reg_label_phone')),

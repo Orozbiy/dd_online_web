@@ -11,7 +11,6 @@ import '../../chat/screens/chat_screen.dart';
 import '../../chat/services/chat_service.dart';
 import '../widgets/review_section.dart';
 import '../widgets/share_widget.dart';
-import '../../cart/screens/cart_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/utils/image_utils.dart';
 
@@ -35,6 +34,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late ProductModel _product;
   String? _sellerUid;
   String? _storeId;
+  String _storeType  = 'market';
+  String _marketName = '';
   String _sellerName = '';
   String _shopName = '';
   String _containerNumber = '';
@@ -68,8 +69,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           });
           if (_sellerUid != null) {
             try {
-              final profile = await supabase.from('profiles').select('full_name').eq('id', _sellerUid!).single();
-              if (mounted) setState(() => _sellerName = profile['full_name'] as String? ?? '');
+            final profile = await supabase.from('profiles').select('full_name, store_type, market_name').eq('id', _sellerUid!).single();
+              if (mounted) setState(() {
+                _sellerName = profile['full_name'] as String? ?? '';
+                _storeType  = profile['store_type']  as String? ?? 'market';
+                _marketName = profile['market_name'] as String? ?? '';
+              });
             } catch (_) {}
           }
         }
@@ -471,6 +476,39 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
                             if (_containerNumber.isNotEmpty) ...[
                               _infoRow(Icons.location_on_outlined, loc.get('container'), _containerNumber, valueColor: AppColors.primary),
                             ],
+
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.storefront_outlined, size: 18, color: AppColors.grey500),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _storeType == 'market'
+                                        ? AppColors.primary.withValues(alpha: 0.1)
+                                        : const Color(0xFF10B981).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: _storeType == 'market'
+                                          ? AppColors.primary.withValues(alpha: 0.4)
+                                          : const Color(0xFF10B981).withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _storeType == 'market' && _marketName.isNotEmpty
+                                        ? '🏪 $_marketName'
+                                        : '🏬 Жеке менчик дүкөн',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: _storeType == 'market'
+                                          ? AppColors.primary
+                                          : const Color(0xFF10B981),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                             if (_workStart.isNotEmpty && _workEnd.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Row(children: [
@@ -596,11 +634,44 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
-            child: IconButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
-              icon: const Icon(Icons.shopping_cart_outlined, color: AppColors.primary),
-              tooltip: loc.get('cart'),
+
+
+         child: IconButton(
+  onPressed: () {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Text('🛒', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Text(
+              loc.locale.languageCode == 'ky'
+                  ? 'Жакында кошулат!'
+                  : 'Скоро появится!',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
+          ],
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  },
+  icon: const Icon(Icons.shopping_cart_outlined, color: AppColors.primary),
+  tooltip: loc.get('cart'),
+),
+
+
+
+
           ),
           const SizedBox(width: 12),
           Expanded(

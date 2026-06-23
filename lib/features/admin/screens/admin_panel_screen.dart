@@ -593,7 +593,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                                                       .radio_button_unchecked,
                                               color: isSelected
                                                   ? AppColors.primary
-                                                  : const Color.fromARGB(255, 23, 61, 117),
+                                                  : const Color.fromARGB(
+                                                      255, 23, 61, 117),
                                             )
                                           : const Text('📦',
                                               style: TextStyle(fontSize: 24)),
@@ -632,15 +633,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                             onPressed: deleteSelected,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.error,
-                              foregroundColor: const Color.fromARGB(255, 61, 192, 116),
+                              foregroundColor:
+                                  const Color.fromARGB(255, 61, 192, 116),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14)),
                               elevation: 0,
                             ),
                             child: Text(
                               '🗑️ Тандалган товарларды өчүрүү (${selectedIds.length})',
-                              style: AppTextStyles.labelLarge
-                                  .copyWith(color: const Color.fromARGB(255, 43, 61, 196)),
+                              style: AppTextStyles.labelLarge.copyWith(
+                                  color:
+                                      const Color.fromARGB(255, 43, 61, 196)),
                             ),
                           ),
                         ),
@@ -789,7 +792,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1E40AF),
-                    disabledBackgroundColor: const Color.fromARGB(255, 86, 136, 236),
+                    disabledBackgroundColor:
+                        const Color.fromARGB(255, 86, 136, 236),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -798,7 +802,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                         ? '🔄  Картаны алмаштыруу'
                         : '✅  Картаны сактоо',
                     style: const TextStyle(
-                        color: Color.fromARGB(255, 226, 47, 47), fontWeight: FontWeight.w600),
+                        color: Color.fromARGB(255, 226, 47, 47),
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -823,7 +828,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   Future<void> _saveAdminCard(String cardNumber, BuildContext ctx) async {
     Navigator.pop(ctx);
     final digits = cardNumber.replaceAll(' ', '');
-    if (digits.length < 16) return;  
+    if (digits.length < 16) return;
     final masked = '•••• ${digits.substring(12)}';
     await supabase.from('admin_settings').upsert({
       'key': 'payment',
@@ -881,6 +886,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     );
   }
 
+  void _openSuggestionsPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SuggestionsPanelSheet(),
+    );
+  }
+
   // ══════════════════════════════════════════════════════
   // BUILD
   // ══════════════════════════════════════════════════════
@@ -898,8 +912,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             const Text('🛡️', style: TextStyle(fontSize: 22)),
             const SizedBox(width: 8),
             Text('Admin панели',
-                style:
-                    AppTextStyles.headingMedium.copyWith(color: const Color.fromARGB(255, 196, 133, 133))),
+                style: AppTextStyles.headingMedium
+                    .copyWith(color: const Color.fromARGB(255, 196, 133, 133))),
           ],
         ),
         actions: [
@@ -910,13 +924,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: _adminCardMasked != null
-                    ? const Color.fromARGB(255, 192, 159, 159).withValues(alpha: 0.2)
+                    ? const Color.fromARGB(255, 192, 159, 159)
+                        .withValues(alpha: 0.2)
                     : AppColors.error.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.credit_card, color: Color.fromARGB(255, 185, 135, 135), size: 16),
+                  const Icon(Icons.credit_card,
+                      color: Color.fromARGB(255, 185, 135, 135), size: 16),
                   const SizedBox(width: 4),
                   Text(
                     _adminCardMasked ?? 'Карта жок',
@@ -929,44 +945,29 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               ),
             ),
           ),
-
-
-          
-
-
-
-GestureDetector(
-  onTap: () => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const AdminStoryManagerScreen()),
-  ),
-  child: const Padding(
-    padding: EdgeInsets.only(right: 4),
-    child: Icon(Icons.auto_stories_rounded,
-        color: Color(0xFFD97706), size: 24),
-  ),
-),
-
-
-
-
-
-
-
-
-
           GestureDetector(
-  onTap: () => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const AdminStatsScreen()),
-  ),
-
-
-  child: const Padding(
-    padding: EdgeInsets.only(right: 8),
-    child: Icon(Icons.bar_chart_rounded, color: Color.fromARGB(255, 44, 131, 185), size: 24),
-  ),
-),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminStoryManagerScreen()),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.auto_stories_rounded,
+                  color: Color(0xFFD97706), size: 24),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminStatsScreen()),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.bar_chart_rounded,
+                  color: Color.fromARGB(255, 44, 131, 185), size: 24),
+            ),
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -996,11 +997,29 @@ GestureDetector(
                 _buildPaymentsTab(),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadData,
-        backgroundColor: const Color(0xFF1E40AF),
-        child: const Icon(Icons.refresh, color: Color.fromARGB(255, 212, 108, 108)),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 💬 Кардарлар билдирүүлөрү
+          FloatingActionButton(
+            heroTag: 'suggestions',
+            onPressed: _openSuggestionsPanel,
+            backgroundColor: Colors.green,
+            child: const Icon(Icons.chat_bubble_outline_rounded,
+                color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          // 🔄 Жаңылоо
+          FloatingActionButton(
+            heroTag: 'refresh',
+            onPressed: _loadData,
+            backgroundColor: const Color(0xFF1E40AF),
+            child: const Icon(Icons.refresh,
+                color: Color.fromARGB(255, 212, 108, 108)),
+          ),
+        ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 
@@ -1162,8 +1181,8 @@ GestureDetector(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Табылды: ${list.length} seller',
-                style:
-                    AppTextStyles.labelSmall.copyWith(color: const Color.fromARGB(255, 47, 99, 201)),
+                style: AppTextStyles.labelSmall
+                    .copyWith(color: const Color.fromARGB(255, 47, 99, 201)),
               ),
             ),
           ),
@@ -1911,6 +1930,159 @@ GestureDetector(
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Ооба', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionsPanelSheet extends StatefulWidget {
+  @override
+  State<_SuggestionsPanelSheet> createState() => _SuggestionsPanelSheetState();
+}
+
+class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
+  List<Map<String, dynamic>> _suggestions = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await supabase
+        .from('buyer_suggestions')
+        .select()
+        .order('created_at', ascending: false);
+    if (mounted) {
+      setState(() {
+        _suggestions = (rows as List)
+            .map((r) => Map<String, dynamic>.from(r as Map))
+            .toList();
+        _loading = false;
+      });
+    }
+  }
+
+  String _typeLabel(String? type) {
+    switch (type) {
+      case 'new_feature':
+        return '🆕 Жаңы нерсе';
+      case 'missing_category':
+        return '📂 Категория жетишпейт';
+      case 'low_stock':
+        return '📦 Товар аз';
+      default:
+        return '💬 Башка';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.80,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E40AF),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Row(
+              children: [
+                const Text('💬', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('Кардарлар билдирүүлөрү',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
+                : _suggestions.isEmpty
+                    ? const Center(
+                        child: Text('Билдирүү жок',
+                            style: TextStyle(color: Colors.white54)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _suggestions.length,
+                        itemBuilder: (_, i) {
+                          final s = _suggestions[i];
+                          final time = DateTime.tryParse(
+                              s['created_at'] as String? ?? '');
+                          final timeStr = time != null
+                              ? '${time.day}/${time.month} ${time.hour}:${time.minute.toString().padLeft(2, '0')}'
+                              : '';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF334155),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.blue.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _typeLabel(s['type'] as String?),
+                                        style: const TextStyle(
+                                            color: Colors.lightBlue,
+                                            fontSize: 11),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(timeStr,
+                                        style: const TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 11)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '👤 ${s['user_name'] ?? 'Белгисиз'}',
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  s['message'] as String? ?? '',
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

@@ -63,12 +63,15 @@ class SellerModel {
   final double? latitude;
   final double? longitude;
 
-  // ── АВТО ТӨЛӨМ ──────────────────────────
+  final String storeType;  
+  final String? marketName;  
+
   final bool autoPayEnabled;
   final String? cardToken;   // PayBox'тан алынган токен
   final String? cardMasked;  // "•••• 4242"
   final DateTime? nextPayDate;
   // ─────────────────────────────────────────
+  
 
   SellerModel({
     required this.uid,
@@ -81,6 +84,8 @@ class SellerModel {
     this.payments = const [],
     this.latitude,
     this.longitude,
+    this.storeType = 'market',
+    this.marketName,
     this.autoPayEnabled = false,
     this.cardToken,
     this.cardMasked,
@@ -136,6 +141,8 @@ class SellerModel {
       payments: paymentsList,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      storeType: json['store_type'] as String? ?? 'market',
+      marketName: json['market_name'] as String?,
       autoPayEnabled: json['auto_pay_enabled'] as bool? ?? false,
       cardToken: json['card_token'] as String?,
       cardMasked: json['card_masked'] as String?,
@@ -158,6 +165,8 @@ class SellerModel {
       'payments': payments.map((p) => p.toJson()).toList(),
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      'store_type': storeType,
+      if (marketName != null) 'market_name': marketName,
       'auto_pay_enabled': autoPayEnabled,
       if (cardToken != null) 'card_token': cardToken,
       if (cardMasked != null) 'card_masked': cardMasked,
@@ -183,6 +192,8 @@ class SellerModel {
   // ── COPY WITH ────────────────────────────
 
   SellerModel copyWith({
+    String? storeType,
+    String? marketName,
     String? uid,
     String? name,
     String? shopName,
@@ -199,6 +210,8 @@ class SellerModel {
     DateTime? nextPayDate,
   }) {
     return SellerModel(
+      storeType: storeType ?? this.storeType,
+      marketName: marketName ?? this.marketName,
       uid: uid ?? this.uid,
       name: name ?? this.name,
       shopName: shopName ?? this.shopName,

@@ -23,6 +23,7 @@ import '../widgets/product_grid.dart';
 import '../../product_detail/screens/product_detail_screen.dart';
 import '../widgets/fav_badge.dart';
 import '../screens/favorites_screen.dart';
+import '../widgets/suggestion_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -392,6 +393,19 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+
+void _showSuggestionSheet() {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => SuggestionButton(),
+  );
+}
+
+
   void _onTitleTap() {
     final now = DateTime.now();
     if (_lastTapTime == null ||
@@ -457,7 +471,6 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildBottomNav(AppLocalizations loc) {
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
-   
 
     return Stack(
       clipBehavior: Clip.none,
@@ -657,13 +670,15 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final theme = Theme.of(context);
-   
+
     final isDark = theme.brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final filterInactiveColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
+    final filterInactiveColor =
+        isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
     final filterIconColor = isDark ? AppColors.grey400 : AppColors.grey600;
-    final dividerColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
+    final dividerColor =
+        isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -883,36 +898,75 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            
 
 
 
 
-                    SliverToBoxAdapter(
+SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
                         child: Row(
-
-                          
                           children: [
                             if (_isSearchMode && !_isLoading)
                               Text(
-                                  '${displayedProducts.length} ${loc.get('results')}',
-                                  style: AppTextStyles.bodyMedium
-                                      .copyWith(color: AppColors.grey500)),
+                                '${displayedProducts.length} ${loc.get('results')}',
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.grey500),
+                              ),
                             if (_isNearbyMode && !_isLoading)
                               Text(
-                                  '📍 ${displayedProducts.length} ${loc.get('nearby_count')}',
-                                  style: AppTextStyles.bodyMedium
-                                      .copyWith(color: AppColors.grey500)),
+                                '📍 ${displayedProducts.length} ${loc.get('nearby_count')}',
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.grey500),
+                              ),
                             if (_filterMode != ProductFilterMode.all &&
                                 !_isSearchMode &&
                                 !_isNearbyMode &&
                                 !_isLoading)
                               Text(
-                                  '${_filterModeLabel(loc)} · ${displayedProducts.length}',
-                                  style: AppTextStyles.bodyMedium
-                                      .copyWith(color: AppColors.grey500)),
+                                '${_filterModeLabel(loc)} · ${displayedProducts.length}',
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.grey500),
+                              ),
+
+                            // ✅ Сурануу — бир жолу, сол жакта
+                            if (!_isSearchMode)
+                              GestureDetector(
+                                onTap: _showSuggestionSheet,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? AppColors.primary
+                                            .withValues(alpha: 0.15)
+                                        : const Color(0xFFEEF2FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.chat_bubble_outline,
+                                          color: AppColors.primary, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '💬 ${loc.get('suggestion')}',
+                                        style: AppTextStyles.labelMedium
+                                            .copyWith(
+                                                color: AppColors.primary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
                             const Spacer(),
+
+                            // ✅ Жаңылоо — оң жакта
                             if (!_isSearchMode)
                               GestureDetector(
                                 onTap: _isNearbyMode
@@ -935,7 +989,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: isDark
-                                        ? AppColors.primary.withValues(alpha: 0.15)
+                                        ? AppColors.primary
+                                            .withValues(alpha: 0.15)
                                         : const Color(0xFFEEF2FF),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
@@ -956,6 +1011,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                 ),
                               ),
+
                             if (_filterCount > 0) ...[
                               const SizedBox(width: 8),
                               GestureDetector(
@@ -965,7 +1021,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: isDark
-                                        ? AppColors.error.withValues(alpha: 0.15)
+                                        ? AppColors.error
+                                            .withValues(alpha: 0.15)
                                         : const Color(0xFFFFEEEE),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
@@ -1131,8 +1188,8 @@ class _HomeScreenState extends State<HomeScreen>
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFFD97706).withValues(alpha: 0.5),
+                            color: const Color(0xFFD97706)
+                                .withValues(alpha: 0.5),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),

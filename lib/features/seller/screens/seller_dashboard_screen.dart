@@ -14,6 +14,8 @@ import 'seller_login_screen.dart';
 import '../../home/screens/home_screen.dart';
 import 'seller_close_account_screen.dart';
 import '../widgets/working_hours_sheet.dart';
+import 'seller_rules_screen.dart';
+import 'seller_edit_profile_screen.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   final String uid;
@@ -82,10 +84,12 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
               child: Text(loc.get('no'), style: const TextStyle(color: AppColors.grey500))),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => SellerCloseAccountScreen(sellerUid: _seller!.uid),
-              ));
+  Navigator.pop(context);
+  Navigator.push(context, MaterialPageRoute(
+    builder: (_) => SellerCloseAccountScreen(sellerUid: _seller!.uid),
+  ));
+
+
             },
             child: Text(loc.get('dash_close_account'), style: const TextStyle(color: AppColors.error)),
           ),
@@ -369,6 +373,26 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                         const SizedBox(height: 4),
                         Text(_seller!.name, style: AppTextStyles.labelMedium.copyWith(color: Colors.white70)),
                       ])),
+
+IconButton(
+
+
+
+ onPressed: () async {
+  final updated = await Navigator.push<bool>(context, MaterialPageRoute(
+    builder: (_) => SellerEditProfileScreen(
+      currentName:      _seller!.name,
+      currentShopName:  _seller!.shopName,
+      currentContainer: _seller!.containerNumber,
+    ),
+  ));
+  if (updated == true) _loadSeller();
+},
+  icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+  padding: EdgeInsets.zero,
+  constraints: const BoxConstraints(),
+),
+
                     ]),
                     const SizedBox(height: 16),
                     const Divider(color: Colors.white24),
@@ -382,6 +406,92 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+
+
+GestureDetector(
+  onTap: () => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const SellerRulesScreen()),
+  ),
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: const Color(0xFFD97706).withValues(alpha: 0.5),
+      ),
+      boxShadow: isDark
+          ? []
+          : [
+              BoxShadow(
+                color: const Color(0xFFD97706).withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+    ),
+    child: Row(
+      children: [
+        // ── Сол жак иконка ──
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: const Color(0xFFD97706).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: const Text('📋', style: TextStyle(fontSize: 22)),
+        ),
+        const SizedBox(width: 14),
+
+        // ── Текст ──
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                loc.get('rules_btn_title'),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : AppColors.black,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                loc.get('rules_btn_sub'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.grey500,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Оң жак жебе ──
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD97706).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 14,
+            color: Color(0xFFD97706),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
+
+const SizedBox(height: 20),
+
+
 
               Text(loc.get('dash_manage'),
                   style: AppTextStyles.headingSmall.copyWith(color: sectionColor)),

@@ -29,13 +29,15 @@ class SellerAuthService {
   ///
   /// [phone] — толук формада +996XXXXXXXXX.
   /// Телефон мурда катталган болсо [SellerPhoneTakenException] кетет.
-  Future<SellerModel> register({
+ Future<SellerModel> register({
     required String phone,
     required String password,
     required String fullName,
     required int age,
     required String containerNumber,
     required String shopName,
+    String storeType = 'market',
+    String? marketName,
   }) async {
     final exists = await phoneExists(phone);
     if (exists) {
@@ -63,6 +65,8 @@ class SellerAuthService {
           'full_name': fullName,
           'age': age,
           'container_number': containerNumber,
+          'store_type': storeType,
+          'market_name': marketName,
           'shop_name': shopName.isNotEmpty ? shopName : containerNumber,
           'seller_status': 'pending',
         })
