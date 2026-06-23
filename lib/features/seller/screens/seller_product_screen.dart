@@ -12,7 +12,10 @@ import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
 import '../screens/flash_sale_manage_screen.dart';
 import 'dart:async';
-import '../../../core/utils/image_picker_helper.dart'; // 
+
+import 'dart:io';// 
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class SellerProductScreen extends StatefulWidget {
   final String sellerUid;
@@ -767,18 +770,31 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
 
 
 
+// _showProductDialog методунан СЫРТТА, класс ичинде өз алдынча метод
 
-Future<void> pickImage(StateSetter setD) async {
+
+
+Future<void> _pickImage(StateSetter setD, {
+  required Uint8List? imageBytes,
+  required void Function(Uint8List) onPicked,
+  required Color dialogBg,
+  required Color textColor,
+}) async {
+  final loc = AppLocalizations.of(context);
   try {
     if (kIsWeb) {
-      final bytes = await pickWebImage();
-      if (bytes != null && bytes.isNotEmpty) {
-        setD(() => imageBytes = bytes);
-      }
+       final input = html.FileUploadInputElement()..accept = 'image/*';
+      input.click();
+      await input.onChange.first;
+      final file = input.files?.first;
+      if (file == null) return;
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoad.first;
+      final bytes = Uint8List.view(reader.result as ByteBuffer);
+      if (bytes.isNotEmpty) onPicked(bytes);
       return;
     }
-
-    // Мобил апп үчүн: камера же галерея
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: dialogBg,
@@ -809,17 +825,31 @@ Future<void> pickImage(StateSetter setD) async {
       ])),
     );
     if (source == null) return;
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source);
-    if (picked != null) {
-      final bytes = await picked.readAsBytes();
-      setD(() => imageBytes = bytes);
-    }
-  } catch (e) {
-    _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
-  }
-}
 
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+    if (picked != null) {
+      final Uint8List bytes;
+      if (kIsWeb) {
+        bytes = await picked.readAsBytes();
+      } else {
+        bytes = await File(picked.path).readAsBytes();
+      }
+      if (bytes.isNotEmpty) {
+        onPicked(bytes);
+      }
+    }
+} catch (e, st) {
+  debugPrint('❌ pickImage ката: $e');
+  debugPrint('❌ stackTrace: $st');
+  _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+}
+}
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -873,7 +903,13 @@ Future<void> pickImage(StateSetter setD) async {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     labelW(loc.get('prod_field_image')),
                     GestureDetector(
-                      onTap: () => pickImage(setD),
+                    onTap: () => _pickImage(
+    setD,
+    imageBytes: imageBytes,
+    onPicked: (bytes) => setD(() => imageBytes = bytes),
+    dialogBg: dialogBg,
+    textColor: textColor,
+  ),
                       child: Container(
                         width: double.infinity, height: 160,
                         decoration: BoxDecoration(
@@ -883,7 +919,9 @@ Future<void> pickImage(StateSetter setD) async {
                             color: imageBytes != null || existingImageUrl.isNotEmpty ? AppColors.primary : AppColors.grey300,
                             width: 1.5,
                           ),
+                          
                         ),
+                        
                         child: imageBytes != null
                             ? ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.memory(imageBytes!, fit: BoxFit.cover))
                             : existingImageUrl.isNotEmpty
@@ -1019,9 +1057,14 @@ Future<void> pickImage(StateSetter setD) async {
                               setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
 
 
-                            final compressed  = await compressImage(imageBytes!);
-final watermarked = await addWatermark(compressed);   // ← жаңы сап
-final uploaded    = await _uploadToCloudinary(watermarked);
+                         final compressed = await compressImage(imageBytes!);
+Uint8List watermarked;
+try {
+  watermarked = await addWatermark(compressed);
+} catch (_) {
+  watermarked = compressed; // watermark ишбесе, ошол бойдон жүктө
+}
+final uploaded = await _uploadToCloudinary(watermarked);
 
                               if (uploaded == null) { setD(() { isLoading = false; isUploading = false; uploadStatus = ''; }); return; }
                               imageUrl = uploaded;

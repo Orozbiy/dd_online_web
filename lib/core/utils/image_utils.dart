@@ -1,19 +1,16 @@
 import 'dart:ui' as ui;
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart'; // kIsWeb
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
-/// Товар сүрөттөрү үчүн компрессия
 Future<Uint8List> compressImage(
   Uint8List bytes, {
   int quality = 75,
   int maxWidth = 800,
   int maxHeight = 800,
 }) async {
-  // Веб платформада flutter_image_compress иштебейт
   if (kIsWeb) return bytes;
-
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth: maxWidth,
@@ -25,7 +22,6 @@ Future<Uint8List> compressImage(
   return result;
 }
 
-/// Чат сүрөттөрү үчүн
 Future<Uint8List> compressChatImage(Uint8List bytes) async {
   if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
@@ -37,7 +33,6 @@ Future<Uint8List> compressChatImage(Uint8List bytes) async {
   );
 }
 
-/// Story сүрөттөрү үчүн
 Future<Uint8List> compressStoryImage(Uint8List bytes) async {
   if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
@@ -52,85 +47,89 @@ Future<Uint8List> compressStoryImage(Uint8List bytes) async {
 
 /// Товар сүрөтүнө "DD Online" watermark кош
 Future<Uint8List> addWatermark(Uint8List bytes) async {
-  // Веб платформада watermark өткөрүп жиберебиз
   if (kIsWeb) return bytes;
 
-  final codec  = await ui.instantiateImageCodec(bytes);
-  final frame  = await codec.getNextFrame();
-  final src    = frame.image;
-
-  // ... калган код өзгөрбөйт
-
+  // ✅ ОҢДОО: бүт функция try-catch ичинде
   try {
-    final w = src.width.toDouble();
-    final h = src.height.toDouble();
-
-    final recorder = ui.PictureRecorder();
-    final canvas   = Canvas(recorder);
-    canvas.drawImage(src, Offset.zero, Paint());
-
-    final fontSize = w * 0.042;
-    final textColor = const Color(0x26FFFFFF);
-
-    final positions = [
-      Offset(w * 0.18, h * 0.50),
-      Offset(w * 0.82, h * 0.50),
-      Offset(w * 0.50, h * 0.18),
-      Offset(w * 0.50, h * 0.82),
-      Offset(w * 0.50, h * 0.50),
-    ];
-
-    for (final pos in positions) {
-      final pb = ui.ParagraphBuilder(ui.ParagraphStyle(
-        textAlign:  TextAlign.center,
-        fontSize:   fontSize,
-        fontWeight: FontWeight.bold,
-      ))
-        ..pushStyle(ui.TextStyle(
-          color:         textColor,
-          fontSize:      fontSize,
-          fontWeight:    FontWeight.bold,
-          letterSpacing: fontSize * 0.1,
-        ))
-        ..addText('DD Online');
-
-      final para = pb.build()
-        ..layout(ui.ParagraphConstraints(width: w * 0.5));
-
-      canvas.save();
-      canvas.translate(pos.dx, pos.dy);
-      canvas.rotate(-45 * 3.14159265 / 180);
-      canvas.drawParagraph(
-        para,
-        Offset(-para.longestLine / 2, -para.height / 2),
-      );
-      canvas.restore();
-    }
-
-    final picture  = recorder.endRecording();
-    final finalImg = await picture.toImage(src.width, src.height);
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final src   = frame.image;
 
     try {
-      final byteData = await finalImg.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final w = src.width.toDouble();
+      final h = src.height.toDouble();
 
-      return FlutterImageCompress.compressWithList(
-        byteData!.buffer.asUint8List(),
-        minWidth:  src.width,
-        minHeight: src.height,
-        quality:   88,
-        format:    CompressFormat.jpeg,
-      );
+      final recorder = ui.PictureRecorder();
+      final canvas   = Canvas(recorder);
+      canvas.drawImage(src, Offset.zero, Paint());
+
+      final fontSize  = w * 0.042;
+      final textColor = const Color(0x26FFFFFF);
+
+      final positions = [
+        Offset(w * 0.18, h * 0.50),
+        Offset(w * 0.82, h * 0.50),
+        Offset(w * 0.50, h * 0.18),
+        Offset(w * 0.50, h * 0.82),
+        Offset(w * 0.50, h * 0.50),
+      ];
+
+      for (final pos in positions) {
+        final pb = ui.ParagraphBuilder(ui.ParagraphStyle(
+          textAlign:  TextAlign.center,
+          fontSize:   fontSize,
+          fontWeight: FontWeight.bold,
+        ))
+          ..pushStyle(ui.TextStyle(
+            color:         textColor,
+            fontSize:      fontSize,
+            fontWeight:    FontWeight.bold,
+            letterSpacing: fontSize * 0.1,
+          ))
+          ..addText('DD Online');
+
+        final para = pb.build()
+          ..layout(ui.ParagraphConstraints(width: w * 0.5));
+
+        canvas.save();
+        canvas.translate(pos.dx, pos.dy);
+        canvas.rotate(-45 * 3.14159265 / 180);
+        canvas.drawParagraph(
+          para,
+          Offset(-para.longestLine / 2, -para.height / 2),
+        );
+        canvas.restore();
+      }
+
+      final picture  = recorder.endRecording();
+      final finalImg = await picture.toImage(src.width, src.height);
+
+      try {
+        final byteData = await finalImg.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        if (byteData == null) return bytes; // ✅ null болсо оригинал кайтар
+
+        return await FlutterImageCompress.compressWithList(
+          byteData.buffer.asUint8List(),
+          minWidth:  src.width,
+          minHeight: src.height,
+          quality:   88,
+          format:    CompressFormat.jpeg,
+        );
+      } finally {
+        finalImg.dispose();
+      }
     } finally {
-      finalImg.dispose();
+      src.dispose();
     }
-  } finally {
-    src.dispose(); // ← src колдонулуп бүткөндөн КИЙИН dispose
+  } catch (e) {
+    // ✅ НЕГИЗГИ ОҢДОО: watermark ишбесе ката ыргытпай, оригиналды кайтар
+    debugPrint('⚠️ Watermark ката (оригинал колдонулат): $e');
+    return bytes;
   }
 }
 
-// Cloudinary URL thumbnail
 String toCloudinaryThumb(String url, {int width = 400}) {
   if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
     return url.replaceFirst('/upload/', '/upload/w_$width,q_auto,f_auto/');
