@@ -1,3 +1,4 @@
+// lib/features/seller/screens/seller_product_screen.dart
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
@@ -7,8 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+// ✅ Даяр conditional import helper колдонобуз
+import '../../../core/utils/image_picker_helper.dart';
 
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
@@ -50,7 +51,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         .toList();
   }
 
-  // ── Legacy категориялар (эски ID'лер үчүн) ──
   static const List<Map<String, String>> _legacyCategories = [
     {'id': '25', 'name': 'Саламаттык / Косметика', 'icon': '💄'},
     {'id': '26', 'name': 'Жеке гигиена',           'icon': '🧴'},
@@ -60,7 +60,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     {'id': '30', 'name': 'Оюнчуктар',              'icon': '🎮'},
   ];
 
-  // ── Размер константалары ──
   static const _allClothSizes    = ['86 см','92 см','98 см','104 см','110 см','116 см','122 см','128 см','134 см','140 см','146 см','152 см','158 см','164 см','XS','S','M','L','XL','XXL','3XL','4XL','5XL'];
   static const _menClothSizes    = ['S','M','L','XL','XXL','3XL','4XL','5XL','44','46','48','50','52','54','56','58','60'];
   static const _womenClothSizes  = ['XS (36)','S (38)','M (40)','L (42)','XL (44)','XXL (46)','3XL (48)','4XL (50)','5XL (52)'];
@@ -101,7 +100,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     });
   }
 
-  // ── Store ID алуу / түзүү ──
   Future<String> _getOrCreateStoreId() async {
     if (_storeId != null) return _storeId!;
     final uid      = widget.sellerUid;
@@ -112,7 +110,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     return _storeId!;
   }
 
-  // ── Товарларды жүктөө ──
   Future<void> _loadProducts() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -126,9 +123,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           .order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
-        _products = (rows as List)
-            .map((r) => Map<String, dynamic>.from(r as Map))
-            .toList();
+        _products  = (rows as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -138,16 +133,16 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     }
   }
 
-  // ── Cloudinary'га жүктөө ──
   Future<String?> _uploadToCloudinary(Uint8List bytes) async {
     final loc = AppLocalizations.of(context);
     try {
       final uri     = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
       final request = http.MultipartRequest('POST', uri)
         ..fields['upload_preset'] = _uploadPreset
-        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'product_${DateTime.now().millisecondsSinceEpoch}.jpg'));
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
-      final response         = await http.Response.fromStream(streamedResponse);
+        ..files.add(http.MultipartFile.fromBytes('file', bytes,
+            filename: 'product_${DateTime.now().millisecondsSinceEpoch}.jpg'));
+      final streamed = await request.send().timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamed);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return data['secure_url'] as String?;
@@ -171,9 +166,18 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     ));
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // ✅ ОҢДОЛГОН _pickImage: dart:io File() алынды, picked.readAsBytes() коюлду
-  // ──────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════
+  // ✅ ТОЛУК ОҢДОЛГОН _pickImage
+  //
+  // Эмне болгон:
+  //   • dart:html шарттуусуз import → мобайлда UnimplementedError
+  //   • dart:io File() → вебте UnimplementedError
+  //   • ImagePicker камера/галерея вебте иштебейт
+  //
+  // Чечим:
+  //   • kIsWeb=true  → pickImageFromWeb() [conditional import, dart:html изоляцияда]
+  //   • kIsWeb=false → ImagePicker (камера/галерея), picked.readAsBytes()
+  // ═══════════════════════════════════════════════════════════════════
   Future<void> _pickImage(
     StateSetter setD, {
     required Uint8List? imageBytes,
@@ -183,22 +187,15 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   }) async {
     final loc = AppLocalizations.of(context);
     try {
-      // ── ВЕБ ──────────────────────────────────────────
+      // ── ВЕБ ──────────────────────────────────────────────────────
       if (kIsWeb) {
-        final input = html.FileUploadInputElement()..accept = 'image/*';
-        input.click();
-        await input.onChange.first;
-        final file = input.files?.first;
-        if (file == null) return;
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoad.first;
-        final bytes = Uint8List.view(reader.result as ByteBuffer);
-        if (bytes.isNotEmpty) onPicked(bytes);
-        return; // ← веб бул жерден чыгат, төмөнкүгө бармайт
+        // dart:html БУЛ ЖЕРДЕ ЖОК — image_picker_platform.dart аркылуу
+        final bytes = await pickWebImage();
+        if (bytes != null && bytes.isNotEmpty) onPicked(bytes);
+        return;
       }
 
-      // ── МОБАЙЛ ───────────────────────────────────────
+      // ── МОБАЙЛ: камера же галерея ─────────────────────────────────
       final source = await showModalBottomSheet<ImageSource>(
         context: context,
         backgroundColor: dialogBg,
@@ -210,8 +207,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
-                  color: AppColors.grey300,
-                  borderRadius: BorderRadius.circular(2))),
+                  color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
@@ -237,12 +233,12 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
         maxWidth: 1200,
         maxHeight: 1200,
       );
-      if (picked != null) {
-        // ✅ ОҢДОО: File(picked.path) эмес → picked.readAsBytes()
-        // XFile.readAsBytes() веб жана мобайлда тең иштейт, dart:io керек эмес
-        final bytes = await picked.readAsBytes();
-        if (bytes.isNotEmpty) onPicked(bytes);
-      }
+      if (picked == null) return;
+
+      // ✅ picked.readAsBytes() — dart:io File() жок
+      final bytes = await picked.readAsBytes();
+      if (bytes.isNotEmpty) onPicked(bytes);
+
     } catch (e, st) {
       debugPrint('❌ pickImage ката: $e');
       debugPrint('❌ stackTrace: $st');
@@ -250,22 +246,23 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     }
   }
 
-  // ── Категория аты ──
   String _getCategoryName(String catId) {
     try {
       final mainId = catId.split('_')[0];
       final cat = _allCategories.firstWhere((c) => c.id == mainId);
       if (catId.contains('_')) {
-       
+        final sub = cat.subcategories.firstWhere((s) => s.id == catId,
+            orElse: () => cat.subcategories.first);
+        return sub.name;
       }
       return cat.name;
     } catch (_) {
-      final legacy = _legacyCategories.firstWhere((c) => c['id'] == catId, orElse: () => {'name': catId});
+      final legacy = _legacyCategories.firstWhere(
+          (c) => c['id'] == catId, orElse: () => {'name': catId});
       return legacy['name'] ?? catId;
     }
   }
 
-  // ── Товар кошуу / өзгөртүү диалогу ──
   Future<void> _showProductDialog({Map<String, dynamic>? existing}) async {
     final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -349,15 +346,17 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
       barrierDismissible: false,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setD) {
-          CategoryModel mainCat = _allCategories.firstWhere((c) => c.id == selectedMainCatId, orElse: () => _allCategories.first);
-          final effectiveCatId  = selectedSubCatId ?? selectedMainCatId;
+          CategoryModel mainCat = _allCategories.firstWhere(
+              (c) => c.id == selectedMainCatId, orElse: () => _allCategories.first);
+          final effectiveCatId = selectedSubCatId ?? selectedMainCatId;
 
           Widget labelW(String text) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(text, style: AppTextStyles.labelMedium.copyWith(color: labelClr)),
-          );
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(text, style: AppTextStyles.labelMedium.copyWith(color: labelClr)),
+              );
 
-          Widget fieldW(TextEditingController ctrl, String hint, {TextInputType type = TextInputType.text}) =>
+          Widget fieldW(TextEditingController ctrl, String hint,
+                  {TextInputType type = TextInputType.text}) =>
               TextField(
                 controller: ctrl, keyboardType: type,
                 style: AppTextStyles.bodyMedium.copyWith(color: textColor),
@@ -377,7 +376,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
             child: Container(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92, maxWidth: 520),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                // ── Header ──
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: const BoxDecoration(
@@ -393,22 +391,15 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                     GestureDetector(onTap: () { if (!isLoading) Navigator.pop(ctx); }, child: const Icon(Icons.close, color: Colors.white)),
                   ]),
                 ),
-
-                // ── Body ──
                 Flexible(child: SingleChildScrollView(
                   padding: const EdgeInsets.all(18),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-                    // Сүрөт
                     labelW(loc.get('prod_field_image')),
                     GestureDetector(
-                      onTap: () => _pickImage(
-                        setD,
-                        imageBytes: imageBytes,
-                        onPicked: (bytes) => setD(() => imageBytes = bytes),
-                        dialogBg: dialogBg,
-                        textColor: textColor,
-                      ),
+                      onTap: () => _pickImage(setD,
+                          imageBytes: imageBytes,
+                          onPicked: (bytes) => setD(() => imageBytes = bytes),
+                          dialogBg: dialogBg, textColor: textColor),
                       child: Container(
                         width: double.infinity, height: 160,
                         decoration: BoxDecoration(
@@ -432,54 +423,42 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       const SizedBox(height: 4),
                       Text(uploadStatus, style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                     ],
-
                     const SizedBox(height: 14),
                     labelW(loc.get('prod_field_name')),
                     fieldW(nameCtrl, loc.get('prod_hint_name')),
-
                     const SizedBox(height: 14),
                     labelW(loc.get('prod_field_price')),
                     fieldW(priceCtrl, loc.get('prod_hint_price'), type: TextInputType.number),
-
                     const SizedBox(height: 14),
                     labelW(loc.get('prod_field_main_cat')),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(color: dropBg, borderRadius: BorderRadius.circular(12)),
                       child: DropdownButtonHideUnderline(child: DropdownButton<String>(
-                        value: selectedMainCatId, isExpanded: true,
-                        dropdownColor: dropBg,
+                        value: selectedMainCatId, isExpanded: true, dropdownColor: dropBg,
                         style: AppTextStyles.bodyMedium.copyWith(color: textColor),
                         items: _allCategories.map((c) => DropdownMenuItem(value: c.id,
                             child: Text('${c.icon}  ${c.name}', style: AppTextStyles.bodyMedium.copyWith(color: textColor)))).toList(),
-                        onChanged: (v) {
-                          if (v != null) setD(() { selectedMainCatId = v; selectedSubCatId = null; selectedSizes.clear(); selectedColors.clear(); });
-                        },
+                        onChanged: (v) { if (v != null) setD(() { selectedMainCatId = v; selectedSubCatId = null; selectedSizes.clear(); selectedColors.clear(); }); },
                       )),
                     ),
-
-                    // Кичи категория
-                    if ((mainCat.subcategories).isNotEmpty) ...[
+                    if (mainCat.subcategories.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       labelW(loc.get('prod_field_sub_cat')),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(color: dropBg, borderRadius: BorderRadius.circular(12)),
                         child: DropdownButtonHideUnderline(child: DropdownButton<String?>(
-                          value: selectedSubCatId, isExpanded: true,
-                          dropdownColor: dropBg,
+                          value: selectedSubCatId, isExpanded: true, dropdownColor: dropBg,
                           style: AppTextStyles.bodyMedium.copyWith(color: textColor),
                           items: [
                             DropdownMenuItem<String?>(value: null, child: Text(loc.get('prod_sub_cat_general'), style: AppTextStyles.bodyMedium.copyWith(color: textColor))),
-                            ...(mainCat.subcategories ).map((s) => DropdownMenuItem(value: s.id,
-                                child: Text(s.name, style: AppTextStyles.bodyMedium.copyWith(color: textColor)))),
+                            ...mainCat.subcategories.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: AppTextStyles.bodyMedium.copyWith(color: textColor)))),
                           ],
                           onChanged: (v) => setD(() { selectedSubCatId = v; selectedSizes.clear(); }),
                         )),
                       ),
                     ],
-
-                    // Эффективдүү категория
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -487,11 +466,9 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       child: Row(children: [
                         const Icon(Icons.label_outline, size: 16, color: AppColors.primary),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(_getCategoryName(effectiveCatId),
-                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary))),
+                        Expanded(child: Text(_getCategoryName(effectiveCatId), style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary))),
                       ]),
                     ),
-
                     const SizedBox(height: 14),
                     if (hasColors(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_colors')),
@@ -513,14 +490,12 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       labelW(loc.get('prod_field_volume')), fieldW(extra2Ctrl, loc.get('prod_hint_volume')), const SizedBox(height: 14),
                     ],
                     if (hasAutoFields(selectedMainCatId)) ...[
-                      labelW(loc.get('prod_field_brand')),       fieldW(extra1Ctrl, loc.get('prod_hint_brand_auto')),  const SizedBox(height: 14),
-                      labelW(loc.get('prod_field_car_compat')),  fieldW(extra2Ctrl, loc.get('prod_hint_car_compat')),  const SizedBox(height: 14),
+                      labelW(loc.get('prod_field_brand')),      fieldW(extra1Ctrl, loc.get('prod_hint_brand_auto')),  const SizedBox(height: 14),
+                      labelW(loc.get('prod_field_car_compat')), fieldW(extra2Ctrl, loc.get('prod_hint_car_compat')),  const SizedBox(height: 14),
                     ],
-
                     labelW(loc.get('prod_field_stock')),
                     fieldW(stockCtrl, loc.get('prod_hint_stock'), type: TextInputType.number),
                     const SizedBox(height: 14),
-
                     labelW(loc.get('prod_field_desc')),
                     TextField(
                       controller: descCtrl, maxLines: 3,
@@ -537,16 +512,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                     const SizedBox(height: 6),
                     Text(loc.get('prod_required_note'), style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400)),
                     const SizedBox(height: 18),
-
-                    // ── Сактоо баскычы ──
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14), elevation: 0,
                         ),
                         onPressed: isLoading ? null : () async {
                           final name  = nameCtrl.text.trim();
@@ -559,16 +531,10 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                             String imageUrl = existingImageUrl;
                             if (imageBytes != null) {
                               setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
-
                               final compressed = await compressImage(imageBytes!);
                               Uint8List watermarked;
-                              try {
-                                watermarked = await addWatermark(compressed);
-                              } catch (_) {
-                                watermarked = compressed;
-                              }
+                              try { watermarked = await addWatermark(compressed); } catch (_) { watermarked = compressed; }
                               final uploaded = await _uploadToCloudinary(watermarked);
-
                               if (uploaded == null) { setD(() { isLoading = false; isUploading = false; uploadStatus = ''; }); return; }
                               imageUrl = uploaded;
                               setD(() { isUploading = false; uploadStatus = loc.get('prod_uploaded'); });
@@ -658,17 +624,9 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Container(width: 14, height: 14,
-                  decoration: BoxDecoration(
-                    color: Color(c['hex'] as int),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.grey300, width: 0.5),
-                  )),
+                  decoration: BoxDecoration(color: Color(c['hex'] as int), shape: BoxShape.circle, border: Border.all(color: AppColors.grey300, width: 0.5))),
               const SizedBox(width: 6),
-              Text(c['name'] as String, style: TextStyle(
-                fontSize: 13,
-                color: isSelected ? AppColors.primary : unselText,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-              )),
+              Text(c['name'] as String, style: TextStyle(fontSize: 13, color: isSelected ? AppColors.primary : unselText, fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
             ]),
           ),
         );
@@ -692,57 +650,31 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
             ),
-            child: Text(size, style: TextStyle(
-              fontSize: 13,
-              color: isSelected ? AppColors.primary : unselText,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-            )),
+            child: Text(size, style: TextStyle(fontSize: 13, color: isSelected ? AppColors.primary : unselText, fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _categoryChip({
-    required String? id,
-    required String icon,
-    required String name,
-    required int count,
-    required bool isDark,
-  }) {
+  Widget _categoryChip({required String? id, required String icon, required String name, required int count, required bool isDark}) {
     final isSelected = _selectedCategoryId == id;
-    final selBg   = AppColors.primary;
-    final unselBg = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
-    final selText   = Colors.white;
-    final unselText = isDark ? Colors.white70 : AppColors.grey600;
-
     return GestureDetector(
       onTap: () => setState(() => _selectedCategoryId = id),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? selBg : unselBg,
-          borderRadius: BorderRadius.circular(20),
-        ),
+            color: isSelected ? AppColors.primary : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
+            borderRadius: BorderRadius.circular(20)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(icon, style: const TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
-          Text(name, style: TextStyle(
-            fontSize: 13,
-            color: isSelected ? selText : unselText,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-          )),
+          Text(name, style: TextStyle(fontSize: 13, color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.grey600), fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
           const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: isSelected ? Colors.white.withValues(alpha: 0.25) : AppColors.grey300,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text('$count', style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : AppColors.grey600,
-            )),
+            decoration: BoxDecoration(color: isSelected ? Colors.white.withValues(alpha: 0.25) : AppColors.grey300, borderRadius: BorderRadius.circular(10)),
+            child: Text('$count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : AppColors.grey600)),
           ),
         ]),
       ),
@@ -753,38 +685,28 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   Widget build(BuildContext context) {
     final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final usedMainCatIds = _products.map((p) => (p['category_id'] as String? ?? '').split('_')[0]).toSet();
 
-    final usedMainCatIds = _products
-        .map((p) => (p['category_id'] as String? ?? '').split('_')[0]).toSet();
-
-    final bgColor       = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
-    final appBarColor   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final titleColor    = isDark ? Colors.white : AppColors.black;
-    final catBarColor   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final cardColor     = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final prodNameColor = isDark ? Colors.white : AppColors.black;
-    final divColor      = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
+    final bgColor     = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
+    final appBarColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor  = isDark ? Colors.white : AppColors.black;
+    final catBarColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final cardColor   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final divColor    = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: appBarColor,
-        elevation: 0,
+        backgroundColor: appBarColor, elevation: 0,
         iconTheme: IconThemeData(color: isDark ? Colors.white : AppColors.grey600),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(loc.get('my_products'),
-              style: AppTextStyles.headingSmall.copyWith(color: titleColor)),
-          Text(widget.shopName,
-              style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+          Text(loc.get('my_products'), style: AppTextStyles.headingSmall.copyWith(color: titleColor)),
+          Text(widget.shopName, style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
         ]),
         actions: [
           IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FlashSaleManageScreen()),
-            ),
-            icon: const Icon(Icons.bolt_rounded, color: Colors.orange),
-            tooltip: 'Flash Sale',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlashSaleManageScreen())),
+            icon: const Icon(Icons.bolt_rounded, color: Colors.orange), tooltip: 'Flash Sale',
           ),
           IconButton(
             onPressed: _loadProducts,
@@ -793,121 +715,102 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Категория фильтр ──
-          Container(
-            color: catBarColor,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(children: [
-                _categoryChip(id: null, icon: '📦', name: loc.get('prod_all'), count: _products.length, isDark: isDark),
-                const SizedBox(width: 8),
-                ..._allCategories.where((cat) => usedMainCatIds.contains(cat.id)).map((cat) {
-                  final count = _products.where((p) => (p['category_id'] as String? ?? '').startsWith(cat.id)).length;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _categoryChip(id: cat.id, icon: cat.icon, name: cat.name, count: count, isDark: isDark),
-                  );
-                }),
-                ..._legacyCategories.where((cat) {
-                  final id = cat['id']!;
-                  return usedMainCatIds.contains(id);
-                }).map((cat) {
-                  final id    = cat['id']!;
-                  final count = _products.where((p) => (p['category_id'] as String? ?? '').startsWith(id)).length;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _categoryChip(id: id, icon: cat['icon']!, name: cat['name']!, count: count, isDark: isDark),
-                  );
-                }),
-              ]),
-            ),
+      body: Column(children: [
+        Container(
+          color: catBarColor,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              _categoryChip(id: null, icon: '📦', name: loc.get('prod_all'), count: _products.length, isDark: isDark),
+              const SizedBox(width: 8),
+              ..._allCategories.where((cat) => usedMainCatIds.contains(cat.id)).map((cat) {
+                final count = _products.where((p) => (p['category_id'] as String? ?? '').startsWith(cat.id)).length;
+                return Padding(padding: const EdgeInsets.only(right: 8),
+                    child: _categoryChip(id: cat.id, icon: cat.icon, name: cat.name, count: count, isDark: isDark));
+              }),
+              ..._legacyCategories.where((cat) => usedMainCatIds.contains(cat['id']!)).map((cat) {
+                final id    = cat['id']!;
+                final count = _products.where((p) => (p['category_id'] as String? ?? '').startsWith(id)).length;
+                return Padding(padding: const EdgeInsets.only(right: 8),
+                    child: _categoryChip(id: id, icon: cat['icon']!, name: cat['name']!, count: count, isDark: isDark));
+              }),
+            ]),
           ),
-          Divider(height: 1, color: divColor),
-
-          // ── Товар тизмеси ──
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                : _filteredProducts.isEmpty
-                    ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        const Text('📦', style: TextStyle(fontSize: 48)),
-                        const SizedBox(height: 12),
-                        Text(_selectedCategoryId == null ? loc.get('prod_empty') : loc.get('prod_empty_cat'),
-                            style: AppTextStyles.headingSmall.copyWith(color: isDark ? Colors.white70 : AppColors.grey600)),
-                        const SizedBox(height: 6),
-                        Text(_selectedCategoryId == null ? loc.get('prod_empty_hint') : loc.get('prod_empty_cat_hint'),
-                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400), textAlign: TextAlign.center),
-                      ]))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _filteredProducts.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) {
-                          final p       = _filteredProducts[i];
-                          final images  = List<String>.from(p['images'] as List? ?? []);
-                          final imgUrl  = images.isNotEmpty ? images.first : '';
-                          final catName = _getCategoryName(p['category_id'] as String? ?? '');
-
-                          return Container(
-                            decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
+        ),
+        Divider(height: 1, color: divColor),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : _filteredProducts.isEmpty
+                  ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Text('📦', style: TextStyle(fontSize: 48)),
+                      const SizedBox(height: 12),
+                      Text(_selectedCategoryId == null ? loc.get('prod_empty') : loc.get('prod_empty_cat'),
+                          style: AppTextStyles.headingSmall.copyWith(color: isDark ? Colors.white70 : AppColors.grey600)),
+                      const SizedBox(height: 6),
+                      Text(_selectedCategoryId == null ? loc.get('prod_empty_hint') : loc.get('prod_empty_cat_hint'),
+                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400), textAlign: TextAlign.center),
+                    ]))
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _filteredProducts.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final p      = _filteredProducts[i];
+                        final images = List<String>.from(p['images'] as List? ?? []);
+                        final imgUrl = images.isNotEmpty ? images.first : '';
+                        return Container(
+                          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            leading: ClipRRect(borderRadius: BorderRadius.circular(10),
                                 child: imgUrl.isNotEmpty
                                     ? Image.network(imgUrl, width: 60, height: 60, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _noImage(isDark))
-                                    : _noImage(isDark),
-                              ),
-                              title: Text(p['title'] as String? ?? '', style: AppTextStyles.labelLarge.copyWith(color: prodNameColor), maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                const SizedBox(height: 2),
-                                Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? '0'} с', style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
-                                Text(catName, style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400)),
-                              ]),
-                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 20),
-                                  onPressed: () => _showProductDialog(existing: p),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
-                                  onPressed: () async {
-                                    final loc2 = AppLocalizations.of(context);
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
+                                    : _noImage(isDark)),
+                            title: Text(p['title'] as String? ?? '',
+                                style: AppTextStyles.labelLarge.copyWith(color: isDark ? Colors.white : AppColors.black),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const SizedBox(height: 2),
+                              Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? '0'} с',
+                                  style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                              Text(_getCategoryName(p['category_id'] as String? ?? ''),
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400)),
+                            ]),
+                            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                              IconButton(icon: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 20), onPressed: () => _showProductDialog(existing: p)),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(context: context,
                                       builder: (_) => AlertDialog(
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                        title: Text(loc2.get('prod_delete_title'), style: AppTextStyles.headingSmall),
-                                        content: Text('"${p['title']}" ${loc2.get('prod_delete_confirm')}'),
+                                        title: Text(loc.get('prod_delete_title'), style: AppTextStyles.headingSmall),
+                                        content: Text('"${p['title']}" ${loc.get('prod_delete_confirm')}'),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(loc2.get('no'), style: const TextStyle(color: AppColors.grey500))),
-                                          TextButton(onPressed: () => Navigator.pop(context, true),  child: Text(loc2.get('prod_delete_yes'), style: const TextStyle(color: AppColors.error))),
+                                          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(loc.get('no'), style: const TextStyle(color: AppColors.grey500))),
+                                          TextButton(onPressed: () => Navigator.pop(context, true),  child: Text(loc.get('prod_delete_yes'), style: const TextStyle(color: AppColors.error))),
                                         ],
-                                      ),
-                                    );
-                                    if (confirm == true) {
-                                      try {
-                                        await supabase.from('products').delete().eq('id', p['id'] as String);
-                                        _showSnack(loc2.get('prod_deleted'));
-                                        _loadProducts();
-                                      } catch (e) {
-                                        _showSnack('${loc2.get('prod_delete_error')}: $e', isError: true);
-                                      }
+                                      ));
+                                  if (confirm == true) {
+                                    try {
+                                      await supabase.from('products').delete().eq('id', p['id'] as String);
+                                      _showSnack(loc.get('prod_deleted'));
+                                      _loadProducts();
+                                    } catch (e) {
+                                      _showSnack('${loc.get('prod_delete_error')}: $e', isError: true);
                                     }
-                                  },
-                                ),
-                              ]),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
+                                  }
+                                },
+                              ),
+                            ]),
+                          ),
+                        );
+                      }),
+        ),
+      ]),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showProductDialog(),
         backgroundColor: AppColors.primary,
