@@ -1,4 +1,3 @@
-// lib/features/seller/screens/seller_product_screen.dart
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
@@ -8,16 +7,17 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
-// ✅ Даяр conditional import helper колдонобуз
-import '../../../core/utils/image_picker_helper.dart';
+// ignore: avoid_web_libraries_in_flutter
+
 
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
-import '../../../core/utils/image_utils.dart';
 import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
 import '../screens/flash_sale_manage_screen.dart';
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 class SellerProductScreen extends StatefulWidget {
   final String sellerUid;
@@ -178,74 +178,132 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   //   • kIsWeb=true  → pickImageFromWeb() [conditional import, dart:html изоляцияда]
   //   • kIsWeb=false → ImagePicker (камера/галерея), picked.readAsBytes()
   // ═══════════════════════════════════════════════════════════════════
-  Future<void> _pickImage(
-    StateSetter setD, {
-    required Uint8List? imageBytes,
-    required void Function(Uint8List) onPicked,
-    required Color dialogBg,
-    required Color textColor,
-  }) async {
-    final loc = AppLocalizations.of(context);
-    try {
-      // ── ВЕБ ──────────────────────────────────────────────────────
-      if (kIsWeb) {
-        // dart:html БУЛ ЖЕРДЕ ЖОК — image_picker_platform.dart аркылуу
-        final bytes = await pickWebImage();
-        if (bytes != null && bytes.isNotEmpty) onPicked(bytes);
-        return;
-      }
+Future<void> _pickImage(
+  StateSetter setD, {
+  required Uint8List? imageBytes,
+  required void Function(Uint8List) onPicked,
+  required Color dialogBg,
+  required Color textColor,
+}) async {
+  debugPrint('🔥 _pickImage чакырылды, kIsWeb=$kIsWeb');
+    final loc = AppLocalizations.of(context); // ← Э
+  try {
 
-      // ── МОБАЙЛ: камера же галерея ─────────────────────────────────
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        backgroundColor: dialogBg,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (ctx) => SafeArea(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 8),
-          Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                  color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-            title: Text('📷  ${loc.get('prod_img_camera')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () => Navigator.pop(ctx, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-            title: Text('🖼️  ${loc.get('prod_img_gallery')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ])),
-      );
-      if (source == null) return;
+   if (kIsWeb) {
+  // Камера же галерея тандоо
+  final choice = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: dialogBg,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const SizedBox(height: 8),
+      Container(width: 40, height: 4,
+          decoration: BoxDecoration(color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(height: 12),
+      ListTile(
+        leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+        title: Text('📷  ${loc.get('prod_img_camera')}',
+            style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+        onTap: () => Navigator.pop(ctx, 'camera'),
+      ),
+      ListTile(
+        leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+        title: Text('🖼️  ${loc.get('prod_img_gallery')}',
+            style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+        onTap: () => Navigator.pop(ctx, 'gallery'),
+      ),
+      const SizedBox(height: 8),
+    ])),
+  );
+  if (choice == null) return;
 
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1200,
-        maxHeight: 1200,
-      );
-      if (picked == null) return;
+  final completer = Completer<Uint8List?>();
+  final input = web.HTMLInputElement()
+    ..type = 'file'
+    ..accept = 'image/*';
 
-      // ✅ picked.readAsBytes() — dart:io File() жок
-      final bytes = await picked.readAsBytes();
-      if (bytes.isNotEmpty) onPicked(bytes);
-
-    } catch (e, st) {
-      debugPrint('❌ pickImage ката: $e');
-      debugPrint('❌ stackTrace: $st');
-      if (mounted) _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
-    }
+  // Камера тандалса capture кош
+  if (choice == 'camera') {
+    input.setAttribute('capture', 'environment');
   }
 
+  input.addEventListener('change', (web.Event e) {
+    final files = input.files;
+    if (files == null || files.length == 0) {
+      completer.complete(null);
+      return;
+    }
+    final file = files.item(0)!;
+    final reader = web.FileReader();
+    reader.addEventListener('loadend', (web.Event e) {
+      final result = reader.result;
+      if (result != null) {
+        final buffer = (result as JSArrayBuffer).toDart;
+        completer.complete(Uint8List.view(buffer));
+      } else {
+        completer.complete(null);
+      }
+    }.toJS);
+    reader.readAsArrayBuffer(file);
+  }.toJS);
+
+  web.document.body!.append(input);
+  input.click();
+
+  final bytes = await completer.future;
+  if (bytes != null && bytes.isNotEmpty) onPicked(bytes);
+  return;
+}
+
+    // Мобайл
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: dialogBg,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 8),
+        Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+                color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(height: 12),
+        ListTile(
+          leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+          title: Text('📷  ${loc.get('prod_img_camera')}',
+              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+          onTap: () => Navigator.pop(ctx, ImageSource.camera),
+        ),
+        ListTile(
+          leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+          title: Text('🖼️  ${loc.get('prod_img_gallery')}',
+              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+          onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+        ),
+        const SizedBox(height: 8),
+      ])),
+    );
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (bytes.isNotEmpty) onPicked(bytes);
+
+} catch (e, st) {
+  debugPrint('❌ Сактоо ката: $e\n$st');
+  if (mounted) _showSnack('Сактоо ката: $e', isError: true);
+}
+}
   String _getCategoryName(String catId) {
     try {
       final mainId = catId.split('_')[0];
@@ -529,12 +587,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                           setD(() { isLoading = true; uploadStatus = ''; });
                           try {
                             String imageUrl = existingImageUrl;
-                            if (imageBytes != null) {
-                              setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
-                              final compressed = await compressImage(imageBytes!);
-                              Uint8List watermarked;
-                              try { watermarked = await addWatermark(compressed); } catch (_) { watermarked = compressed; }
-                              final uploaded = await _uploadToCloudinary(watermarked);
+
+
+                           if (imageBytes != null) {
+  setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
+  final uploaded = await _uploadToCloudinary(imageBytes!);
+
+
                               if (uploaded == null) { setD(() { isLoading = false; isUploading = false; uploadStatus = ''; }); return; }
                               imageUrl = uploaded;
                               setD(() { isUploading = false; uploadStatus = loc.get('prod_uploaded'); });
@@ -557,11 +616,21 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                             if (ctx.mounted) Navigator.pop(ctx);
                             _showSnack(existing == null ? loc.get('prod_added') : loc.get('prod_updated'));
                             _loadProducts();
-                          } catch (e) {
-                            setD(() { isLoading = false; isUploading = false; uploadStatus = ''; });
-                            _showSnack('${loc.get('prod_save_error')}: $e', isError: true);
-                          }
+
+
+
+
+                     } catch (e, st) {
+  debugPrint('❌ Сактоо ката: $e\n$st');
+  setD(() { isLoading = false; isUploading = false; uploadStatus = ''; });
+  _showSnack('Сактоо ката: $e', isError: true);
+}
+
+
+
+
                         },
+
                         child: isLoading
                             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : Text(existing == null ? loc.get('prod_btn_save') : loc.get('prod_btn_update'),
@@ -811,11 +880,14 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                       }),
         ),
       ]),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showProductDialog(),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+    floatingActionButton: FloatingActionButton(
+  onPressed: () {
+    debugPrint('🔥 FAB басылды');
+    _showProductDialog();
+  },
+  backgroundColor: AppColors.primary,
+  child: const Icon(Icons.add, color: Colors.white),
+),
     );
   }
 }
