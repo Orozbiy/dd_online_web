@@ -1,4 +1,5 @@
 // lib/features/chat/models/message_model.dart
+// ✅ message_type кошулду: 'text' | 'image' | 'audio' | 'call_request'
 
 class MessageModel {
   final String  id;
@@ -11,6 +12,8 @@ class MessageModel {
   final bool    isRead;
   final String? replyToId;
   final String? replyToText;
+  final String  messageType; // ✅ ЖАҢЫ: 'text' | 'image' | 'audio' | 'call_request'
+  final String? callStatus;  // ✅ ЖАҢЫ: 'pending' | 'accepted' | 'declined'
 
   MessageModel({
     required this.id,
@@ -23,7 +26,14 @@ class MessageModel {
     required this.isRead,
     this.replyToId,
     this.replyToText,
+    this.messageType = 'text',
+    this.callStatus,
   });
+
+  bool get isCallRequest => messageType == 'call_request';
+  bool get isCallPending  => isCallRequest && (callStatus == 'pending' || callStatus == null);
+  bool get isCallAccepted => isCallRequest && callStatus == 'accepted';
+  bool get isCallDeclined => isCallRequest && callStatus == 'declined';
 
   factory MessageModel.fromMap(Map<String, dynamic> data) {
     return MessageModel(
@@ -33,17 +43,17 @@ class MessageModel {
       imageUrl:      data['image_url']      as String?,
       audioUrl:      data['audio_url']      as String?,
       audioDuration: (data['audio_duration'] as num?)?.toInt(),
-      // ✅ .toLocal() — UTC → жергиликтүү убакыт (туура убакыт)
       timestamp: data['created_at'] != null
           ? DateTime.parse(data['created_at'] as String).toLocal()
           : DateTime.now(),
       isRead:        data['is_read']        as bool? ?? false,
       replyToId:     data['reply_to_id']    as String?,
       replyToText:   data['reply_to_text']  as String?,
+      messageType:   data['message_type']   as String? ?? 'text', // ✅
+      callStatus:    data['call_status']    as String?,           // ✅
     );
   }
 
-  /// WhatsApp стилинде: саат:мүнөт (жергиликтүү убакыт)
   String get formattedTime {
     final h = timestamp.hour.toString().padLeft(2, '0');
     final m = timestamp.minute.toString().padLeft(2, '0');
@@ -61,6 +71,8 @@ class MessageModel {
     bool?     isRead,
     String?   replyToId,
     String?   replyToText,
+    String?   messageType,
+    String?   callStatus,
   }) {
     return MessageModel(
       id:            id            ?? this.id,
@@ -73,6 +85,8 @@ class MessageModel {
       isRead:        isRead        ?? this.isRead,
       replyToId:     replyToId     ?? this.replyToId,
       replyToText:   replyToText   ?? this.replyToText,
+      messageType:   messageType   ?? this.messageType,
+      callStatus:    callStatus    ?? this.callStatus,
     );
   }
 }

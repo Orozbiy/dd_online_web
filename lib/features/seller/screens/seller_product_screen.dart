@@ -52,13 +52,13 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   }
 
   static const List<Map<String, String>> _legacyCategories = [
-    {'id': '25', 'name': 'Саламаттык / Косметика', 'icon': '💄'},
-    {'id': '26', 'name': 'Жеке гигиена',           'icon': '🧴'},
-    {'id': '27', 'name': 'Азык-түлүк',             'icon': '🛒'},
-    {'id': '28', 'name': 'Автотовар',              'icon': '🚗'},
-    {'id': '29', 'name': 'Китептер / Канцтовар',   'icon': '📚'},
-    {'id': '30', 'name': 'Оюнчуктар',              'icon': '🎮'},
-  ];
+  {'id': '25', 'name_ky': 'Саламаттык / Косметика', 'name_ru': 'Здоровье / Косметика', 'icon': '💄'},
+  {'id': '26', 'name_ky': 'Жеке гигиена',           'name_ru': 'Личная гигиена',        'icon': '🧴'},
+  {'id': '27', 'name_ky': 'Азык-түлүк',             'name_ru': 'Продукты питания',      'icon': '🛒'},
+  {'id': '28', 'name_ky': 'Автотовар',              'name_ru': 'Автотовары',            'icon': '🚗'},
+  {'id': '29', 'name_ky': 'Китептер / Канцтовар',   'name_ru': 'Книги / Канцтовары',   'icon': '📚'},
+  {'id': '30', 'name_ky': 'Оюнчуктар',              'name_ru': 'Игрушки',              'icon': '🎮'},
+];
 
   static const _allClothSizes    = ['86 см','92 см','98 см','104 см','110 см','116 см','122 см','128 см','134 см','140 см','146 см','152 см','158 см','164 см','XS','S','M','L','XL','XXL','3XL','4XL','5XL'];
   static const _menClothSizes    = ['S','M','L','XL','XXL','3XL','4XL','5XL','44','46','48','50','52','54','56','58','60'];
@@ -69,27 +69,27 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
   static const _allShoesSizes    = ['16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47'];
   static const _fabricSizes      = ['0.5 м','1 м','1.5 м','2 м','2.5 м','3 м','4 м','5 м','10 м','20 м','50 м'];
 
-  final List<Map<String, dynamic>> _allColors = [
-    {'name': 'Кара',         'hex': 0xFF000000},
-    {'name': 'Ак',           'hex': 0xFFFFFFFF},
-    {'name': 'Кызыл',        'hex': 0xFFEF4444},
-    {'name': 'Көк',          'hex': 0xFF3B82F6},
-    {'name': 'Жашыл',        'hex': 0xFF22C55E},
-    {'name': 'Сары',         'hex': 0xFFEAB308},
-    {'name': 'Кызгылт',      'hex': 0xFFEC4899},
-    {'name': 'Күрөң',        'hex': 0xFF92400E},
-    {'name': 'Боз',          'hex': 0xFF6B7280},
-    {'name': 'Күлгүн',       'hex': 0xFF8B5CF6},
-    {'name': 'Кызгылт сары', 'hex': 0xFFF97316},
-    {'name': 'Ачык көк',     'hex': 0xFF06B6D4},
-    {'name': 'Бежевый',      'hex': 0xFFF5F0DC},
-    {'name': 'Кремовый',     'hex': 0xFFFFFDD0},
-    {'name': 'Жыгач',        'hex': 0xFF8B4513},
-    {'name': 'Алтын',        'hex': 0xFFFFD700},
-    {'name': 'Күмүш',        'hex': 0xFFC0C0C0},
-    {'name': 'Кара жашыл',   'hex': 0xFF006400},
-    {'name': 'Темно-көк',    'hex': 0xFF00008B},
-  ];
+final List<Map<String, dynamic>> _allColors = [
+  {'key': 'color_black',     'hex': 0xFF000000},
+  {'key': 'color_white',     'hex': 0xFFFFFFFF},
+  {'key': 'color_red',       'hex': 0xFFEF4444},
+  {'key': 'color_blue',      'hex': 0xFF3B82F6},
+  {'key': 'color_green',     'hex': 0xFF22C55E},
+  {'key': 'color_yellow',    'hex': 0xFFEAB308},
+  {'key': 'color_pink',      'hex': 0xFFEC4899},
+  {'key': 'color_brown',     'hex': 0xFF92400E},
+  {'key': 'color_grey',      'hex': 0xFF6B7280},
+  {'key': 'color_purple',    'hex': 0xFF8B5CF6},
+  {'key': 'color_orange',    'hex': 0xFFF97316},
+  {'key': 'color_lightblue', 'hex': 0xFF06B6D4},
+  {'key': 'color_beige',     'hex': 0xFFF5F0DC},
+  {'key': 'color_cream',     'hex': 0xFFFFFDD0},
+  {'key': 'color_wood',      'hex': 0xFF8B4513},
+  {'key': 'color_gold',      'hex': 0xFFFFD700},
+  {'key': 'color_silver',    'hex': 0xFFC0C0C0},
+  {'key': 'color_darkgreen', 'hex': 0xFF006400},
+  {'key': 'color_darkblue',  'hex': 0xFF00008B},
+];
 
   @override
   void initState() {
@@ -304,22 +304,28 @@ Future<void> _pickImage(
   if (mounted) _showSnack('Сактоо ката: $e', isError: true);
 }
 }
-  String _getCategoryName(String catId) {
-    try {
-      final mainId = catId.split('_')[0];
-      final cat = _allCategories.firstWhere((c) => c.id == mainId);
-      if (catId.contains('_')) {
-        final sub = cat.subcategories.firstWhere((s) => s.id == catId,
-            orElse: () => cat.subcategories.first);
-        return sub.name;
-      }
-      return cat.name;
-    } catch (_) {
-      final legacy = _legacyCategories.firstWhere(
-          (c) => c['id'] == catId, orElse: () => {'name': catId});
-      return legacy['name'] ?? catId;
+
+
+String _getCategoryName(String catId) {
+  final loc = AppLocalizations.of(context);
+  final langCode = loc.locale.languageCode;
+  try {
+    final mainId = catId.split('_')[0];
+    final cat = _allCategories.firstWhere((c) => c.id == mainId);
+    if (catId.contains('_')) {
+      final sub = cat.subcategories.firstWhere(
+          (s) => s.id == catId, orElse: () => cat.subcategories.first);
+      return sub.localizedName(langCode);
     }
+    return cat.localizedName(langCode);
+  } catch (_) {
+    final legacy = _legacyCategories.firstWhere(
+        (c) => c['id'] == catId, orElse: () => {'name_ky': catId, 'name_ru': catId});
+    return langCode == 'ru'
+        ? (legacy['name_ru'] ?? catId)
+        : (legacy['name_ky'] ?? catId);
   }
+}
 
   Future<void> _showProductDialog({Map<String, dynamic>? existing}) async {
     final loc    = AppLocalizations.of(context);
@@ -675,33 +681,51 @@ Future<void> _pickImage(
         ],
       );
 
-  Widget _colorPicker(List<String> selected, StateSetter setD, bool isDark) {
-    final unselBg   = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
-    final unselText = isDark ? Colors.white70 : AppColors.grey600;
-    return Wrap(
-      spacing: 8, runSpacing: 8,
-      children: _allColors.map((c) {
-        final isSelected = selected.contains(c['name']);
-        return GestureDetector(
-          onTap: () => setD(() { if (isSelected) selected.remove(c['name']); else selected.add(c['name'] as String); }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : unselBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 14, height: 14,
-                  decoration: BoxDecoration(color: Color(c['hex'] as int), shape: BoxShape.circle, border: Border.all(color: AppColors.grey300, width: 0.5))),
-              const SizedBox(width: 6),
-              Text(c['name'] as String, style: TextStyle(fontSize: 13, color: isSelected ? AppColors.primary : unselText, fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
-            ]),
+
+Widget _colorPicker(List<String> selected, StateSetter setD, bool isDark) {
+  final loc       = AppLocalizations.of(context);   // ← кошулду
+  final unselBg   = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
+  final unselText = isDark ? Colors.white70 : AppColors.grey600;
+  return Wrap(
+    spacing: 8, runSpacing: 8,
+    children: _allColors.map((c) {
+      final key        = c['key'] as String;
+      final colorName  = loc.get(key);              // ← тилге жараша ат
+      final isSelected = selected.contains(key);    // ← key менен салыштыруу
+      return GestureDetector(
+        onTap: () => setD(() {
+          if (isSelected) selected.remove(key); else selected.add(key);
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : unselBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: isSelected ? AppColors.primary : Colors.transparent),
           ),
-        );
-      }).toList(),
-    );
-  }
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 14, height: 14,
+              decoration: BoxDecoration(
+                color: Color(c['hex'] as int),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.grey300, width: 0.5),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(colorName,   // ← которулган ат
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isSelected ? AppColors.primary : unselText,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                )),
+          ]),
+        ),
+      );
+    }).toList(),
+  );
+}
 
   Widget _sizePicker(List<String> allSizes, List<String> selected, StateSetter setD, bool isDark) {
     final unselBg   = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);

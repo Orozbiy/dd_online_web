@@ -463,7 +463,7 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(loc.get('seller'), style: AppTextStyles.headingSmall),
+                           Text(loc.get('seller'), style: AppTextStyles.headingMedium),
                             const SizedBox(height: 12),
                             if (_shopName.isNotEmpty) ...[
                               _infoRow(Icons.store_outlined, loc.get('shop'), _shopName),
@@ -706,7 +706,7 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(loc.get('characteristics'), style: AppTextStyles.headingSmall),
+         Text(loc.get('characteristics'), style: AppTextStyles.headingMedium),
           const SizedBox(height: 12),
           if (hasStock) ...[
             Row(children: [
@@ -722,16 +722,143 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
             ]),
             const SizedBox(height: 10),
           ],
-          if (hasColors) ...[
-            Text('🎨 ${loc.get('colors')}', style: AppTextStyles.labelMedium.copyWith(color: AppColors.grey500)),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: _product.colors.map((c) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: chipColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: chipBorder)),
-              child: Text(c, style: AppTextStyles.labelSmall),
-            )).toList()),
-            const SizedBox(height: 10),
+
+
+
+
+
+
+
+
+
+
+
+
+        if (hasColors) ...[
+  Text('🎨 ${loc.get('colors')}',
+      style: AppTextStyles.labelMedium.copyWith(color: AppColors.grey500)),
+  const SizedBox(height: 8),
+  Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: _product.colors.map((c) {
+      // Эски format (color_white) → кыргызча
+      const legacyToKy = {
+        'color_white':     'Ак',
+        'color_black':     'Кара',
+        'color_red':       'Кызыл',
+        'color_blue':      'Көк',
+        'color_green':     'Жашыл',
+        'color_yellow':    'Сары',
+        'color_pink':      'Кызгылт',
+        'color_brown':     'Күрөң',
+        'color_grey':      'Боз',
+        'color_gray':      'Боз',
+        'color_purple':    'Күлгүн',
+        'color_orange':    'Кызгылт сары',
+        'color_lightblue': 'Ачык көк',
+        'color_beige':     'Бежевый',
+        'color_cream':     'Кремовый',
+        'color_gold':      'Алтын',
+        'color_silver':    'Күмүш',
+        'color_darkgreen': 'Кара жашыл',
+        'color_darkblue':  'Темно-көк',
+      };
+
+      // Кыргызча → орусча
+      const kyToRu = {
+        'Кара':         'Чёрный',
+        'Ак':           'Белый',
+        'Кызыл':        'Красный',
+        'Көк':          'Синий',
+        'Жашыл':        'Зелёный',
+        'Сары':         'Жёлтый',
+        'Кызгылт':      'Розовый',
+        'Күрөң':        'Коричневый',
+        'Боз':          'Серый',
+        'Күлгүн':       'Фиолетовый',
+        'Кызгылт сары': 'Оранжевый',
+        'Ачык көк':     'Голубой',
+        'Бежевый':      'Бежевый',
+        'Кремовый':     'Кремовый',
+        'Жыгач':        'Деревянный',
+        'Алтын':        'Золотой',
+        'Күмүш':        'Серебряный',
+        'Кара жашыл':   'Тёмно-зелёный',
+        'Темно-көк':    'Тёмно-синий',
+      };
+
+      // Түс чекити (hex)
+      const colorHexMap = {
+        'Кара':         0xFF1C1C1C,
+        'Ак':           0xFFEEEEEE,
+        'Кызыл':        0xFFEF4444,
+        'Көк':          0xFF3B82F6,
+        'Жашыл':        0xFF22C55E,
+        'Сары':         0xFFEAB308,
+        'Кызгылт':      0xFFEC4899,
+        'Күрөң':        0xFF92400E,
+        'Боз':          0xFF6B7280,
+        'Күлгүн':       0xFF8B5CF6,
+        'Кызгылт сары': 0xFFF97316,
+        'Ачык көк':     0xFF06B6D4,
+        'Бежевый':      0xFFF5F0DC,
+        'Кремовый':     0xFFFFFDD0,
+        'Жыгач':        0xFF8B4513,
+        'Алтын':        0xFFFFD700,
+        'Күмүш':        0xFFC0C0C0,
+        'Кара жашыл':   0xFF006400,
+        'Темно-көк':    0xFF00008B,
+      };
+
+      final ky      = legacyToKy[c] ?? c;
+      final display = loc.locale.languageCode == 'ru'
+          ? (kyToRu[ky] ?? ky)
+          : ky;
+      final hex = colorHexMap[ky];
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: chipColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: chipBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hex != null) ...[
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Color(hex),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.grey.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(display, style: AppTextStyles.labelSmall),
           ],
+        ),
+      );
+    }).toList(),
+  ),
+  const SizedBox(height: 10),
+],
+
+
+
+
+
+
+
+
+
+
           if (hasSizes) ...[
             Text('📐 ${loc.get('sizes')}', style: AppTextStyles.labelMedium.copyWith(color: AppColors.grey500)),
             const SizedBox(height: 8),
@@ -756,6 +883,31 @@ Text(_product.name, style: AppTextStyles.headingMedium.copyWith(fontSize: 24)),
     ]);
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ══════════════════════════════════════════════════════
 // 2ГИС НАВИГАЦИЯ BOTTOM SHEET

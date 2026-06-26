@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
+/// Товар сүрөттөрү үчүн компрессия
+/// maxWidth/maxHeight — сүрөт ушул өлчөмдөн ЧОҢ болсо КИЧИРЕЙТЕТ
 Future<Uint8List> compressImage(
   Uint8List bytes, {
   int quality = 75,
@@ -13,43 +15,49 @@ Future<Uint8List> compressImage(
   if (kIsWeb) return bytes;
   final result = await FlutterImageCompress.compressWithList(
     bytes,
-    minWidth: maxWidth,
-    minHeight: maxHeight,
-    quality: quality,
-    format: CompressFormat.jpeg,
-    keepExif: false,
+    minWidth:  maxWidth,   // flutter_image_compress-та бул чынында MAX катары иштейт
+    minHeight: maxHeight,  // сүрөт кичине болсо чоңоюп кетпейт
+    quality:   quality,
+    format:    CompressFormat.jpeg,
+    keepExif:  false,
   );
-  return result;
+  // ✅ Эгер compress оригиналдан чоң болсо — оригиналды кайтар
+  return result.length < bytes.length ? result : bytes;
 }
 
+/// Чат сүрөттөрү үчүн — кичирек өлчөм
 Future<Uint8List> compressChatImage(Uint8List bytes) async {
   if (kIsWeb) return bytes;
-  return FlutterImageCompress.compressWithList(
+  final result = await FlutterImageCompress.compressWithList(
     bytes,
-    minWidth: 800,
-    minHeight: 800,
-    quality: 70,
-    format: CompressFormat.jpeg,
+    minWidth:  600,
+    minHeight: 600,
+    quality:   65,
+    format:    CompressFormat.jpeg,
+    keepExif:  false,
   );
+  return result.length < bytes.length ? result : bytes;
 }
 
+/// Story сүрөттөрү үчүн
 Future<Uint8List> compressStoryImage(Uint8List bytes) async {
   if (kIsWeb) return bytes;
-  return FlutterImageCompress.compressWithList(
+  final result = await FlutterImageCompress.compressWithList(
     bytes,
-    minWidth: 1080,
+    minWidth:  1080,
     minHeight: 1920,
-    quality: 85,
-    keepExif: false,
-    format: CompressFormat.jpeg,
+    quality:   80,   // 85 → 80, Cloudinary'ды аябай толтурбайт
+    keepExif:  false,
+    format:    CompressFormat.jpeg,
   );
+  return result.length < bytes.length ? result : bytes;
 }
 
 /// Товар сүрөтүнө "DD Online" watermark кош
+/// ✅ Watermark'тан кийин JPEG'ке re-compress — PNG чоңойуп кетпейт
 Future<Uint8List> addWatermark(Uint8List bytes) async {
   if (kIsWeb) return bytes;
 
-  // ✅ ОҢДОО: бүт функция try-catch ичинде
   try {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
@@ -106,17 +114,22 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
 
       try {
         final byteData = await finalImg.toByteData(
-          format: ui.ImageByteFormat.png,
+          format: ui.ImageByteFormat.png, // watermark PNG'де чыгат
         );
-        if (byteData == null) return bytes; // ✅ null болсо оригинал кайтар
+        if (byteData == null) return bytes;
 
-        return await FlutterImageCompress.compressWithList(
+        // ✅ НЕГИЗГИ ОҢДОО: PNG → JPEG re-compress, өлчөмдү да кичирейт
+        final recompressed = await FlutterImageCompress.compressWithList(
           byteData.buffer.asUint8List(),
-          minWidth:  src.width,
+          minWidth:  src.width,   // оригинал өлчөмдү сакта (чоңоюп кетпесин)
           minHeight: src.height,
-          quality:   88,
+          quality:   82,          // 88 → 82, Cloudinary памятын аябайт
           format:    CompressFormat.jpeg,
+          keepExif:  false,
         );
+
+        // ✅ Эгер watermark+compress оригиналдан чоң болсо — bytes кайтар
+        return recompressed.length < bytes.length ? recompressed : bytes;
       } finally {
         finalImg.dispose();
       }
@@ -124,12 +137,12 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
       src.dispose();
     }
   } catch (e) {
-    // ✅ НЕГИЗГИ ОҢДОО: watermark ишбесе ката ыргытпай, оригиналды кайтар
     debugPrint('⚠️ Watermark ката (оригинал колдонулат): $e');
     return bytes;
   }
 }
 
+/// Cloudinary URL'ду thumbnail версиясына айлантуу
 String toCloudinaryThumb(String url, {int width = 400}) {
   if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
     return url.replaceFirst('/upload/', '/upload/w_$width,q_auto,f_auto/');

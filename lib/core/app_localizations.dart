@@ -566,13 +566,13 @@ class AppLocalizations {
 
     // Жазылуу
     'sub_monthly': 'Айлык жазылуу',
-    'sub_charge_info': 'Ар айдын 1-күнүндө 2 000 сом алынат',
+    'sub_charge_info': 'Ар ай жаңыланганда  1 000 сом алынат',
     'sub_card_linked': 'байланган',
     'sub_new_card': 'Жаңы карта номери (алмаштыруу)',
     'sub_card_number': 'Карта номери',
     'sub_expiry': 'Мөөнөтү',
     'sub_agree_text':
-        'Ар айдын 1-күнүндө картамдан 2 000 сом алынышына макулмун. Каалаган убакта токтотсо болот.',
+        'Ар айдын 1-күнүндө картамдан 1 000 сом алынышына макулмун. Каалаган убакта токтотсо болот.',
     'sub_replace_card': '🔄  Картаны алмаштыруу',
     'sub_link_card': '✅  Картаны байлоо',
     'sub_cancel_autopay': '⛔  Авто төлөмдү токтотуу',
@@ -583,8 +583,8 @@ class AppLocalizations {
     'sub_status_paid': '✅ Бул айдын төлөмү өткөрүлдү',
     'sub_status_active': '💳 Авто төлөм иштеп жатат',
     'sub_status_paused': '⏸️ Авто төлөм токтотулган',
-    'sub_status_none': '💳 Жазылуу — 2 000 сом/ай',
-    'sub_per_month': '2 000 сом/ай',
+    'sub_status_none': '💳 Жазылуу — (1000-500) сом/ай',
+    'sub_per_month': '1000 сом/ай',
     'sub_charge_day': 'Айдын 1-күнүндө алынат',
     'sub_link_hint': 'Картаны байлап авто төлөм орнотуңуз',
     'loc_saved': '✅ Локация сакталды!',
@@ -778,11 +778,39 @@ class AppLocalizations {
         'Уникалдуулук — кардарды өзгөчө сезиндирет.',
     'rules_6_tip':
         '"Баары бар" дүкөн — эч нерсеси жок дүкөн. Бир нерседе мыкты болуңуз.',
+          'call_request_title':        'Чалуу өтүнүчү',
+    'call_request_sent':         'Чалуу өтүнүчү жиберилди',
+    'call_request_received':     'Сизге чалуу сурады',
+    'call_request_accepted':     'Чалуу кабыл алынды',
+    'call_request_declined':     'Чалуу четке кагылды',
+    'call_request_accept_btn':   '📞 Кабыл алуу',
+    'call_request_decline_btn':  '❌ Четке кагуу',
+    'call_request_status_ok':    '✅ Кабыл алынды',
+    'call_request_status_no':    '❌ Четке кагылды',
+    'call_request_dialog_title': '📞 Чалуу өтүнүчү',
+    'call_request_dialog_body':  'Сатуучуга чалуу өтүнүчү жиберилет.\nАл кабыл алганда телефон чалынат.',
+    'call_request_dialog_send':  'Жиберүү',
+    'call_request_tooltip':      'Чалуу суроо',
+    'call_request_error':        'Ката чыкты, кайра аракет кылыңыз',
 
   };
 
   static const _ru = {
     // 🎰 Рулетка — Drawer кнопка
+     'call_request_title':        'Запрос звонка',
+    'call_request_sent':         'Запрос на звонок отправлен',
+    'call_request_received':     'Просит вас позвонить',
+    'call_request_accepted':     'Звонок принят',
+    'call_request_declined':     'Звонок отклонён',
+    'call_request_accept_btn':   '📞 Принять',
+    'call_request_decline_btn':  '❌ Отклонить',
+    'call_request_status_ok':    '✅ Принят',
+    'call_request_status_no':    '❌ Отклонён',
+    'call_request_dialog_title': '📞 Запрос звонка',
+    'call_request_dialog_body':  'Продавцу будет отправлен запрос на звонок.\nКогда он примет — телефон позвонит.',
+    'call_request_dialog_send':  'Отправить',
+    'call_request_tooltip':      'Запросить звонок',
+    'call_request_error':        'Ошибка, попробуйте ещё раз',
     'suggestion': 'Отправить запрос',
     'rules_btn_title': 'Золотые правила продавца',
     'rules_btn_sub': '6 ключевых правил для успешной торговли',
@@ -1166,13 +1194,13 @@ class AppLocalizations {
 
     // Подписка
     'sub_monthly': 'Ежемесячная подписка',
-    'sub_charge_info': '2 000 сом списывается 1-го числа каждого месяца',
+    'sub_charge_info': '(1000-500) сом списывается 1-го числа каждого месяца',
     'sub_card_linked': 'привязана',
     'sub_new_card': 'Новый номер карты (замена)',
     'sub_card_number': 'Номер карты',
     'sub_expiry': 'Срок действия',
     'sub_agree_text':
-        'Соглашаюсь на списание 2 000 сом с карты 1-го числа каждого месяца. Можно отменить в любое время.',
+        'Соглашаюсь на списание  (1000-500) сом с карты 1-го числа каждого месяца. Можно отменить в любое время.',
     'sub_replace_card': '🔄  Заменить карту',
     'sub_link_card': '✅  Привязать карту',
     'sub_cancel_autopay': '⛔  Отключить автоплатёж',
@@ -1183,8 +1211,8 @@ class AppLocalizations {
     'sub_status_paid': '✅ Оплата за этот месяц прошла',
     'sub_status_active': '💳 Автоплатёж активен',
     'sub_status_paused': '⏸️ Автоплатёж приостановлен',
-    'sub_status_none': '💳 Подписка — 2 000 сом/мес',
-    'sub_per_month': '2 000 сом/мес',
+    'sub_status_none': '💳 Подписка — (1000-500) сом/мес',
+    'sub_per_month': '500-1000 сом/мес',
     'sub_charge_day': 'Списывается 1-го числа',
     'sub_link_hint': 'Привяжите карту для автоплатежа',
 
