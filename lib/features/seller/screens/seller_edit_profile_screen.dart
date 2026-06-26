@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
-import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 
 class SellerEditProfileScreen extends StatefulWidget {
@@ -21,8 +20,10 @@ class SellerEditProfileScreen extends StatefulWidget {
 }
 
 class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
-  String _storeType = 'market'; // 'market' | 'private'
+  String  _storeType  = 'market';
   String? _marketName = 'Дордой базары';
+  bool    _isLoading  = false;
+  bool    _initLoading = true;
 
   static const List<String> _markets = [
     'Дордой базары',
@@ -45,6 +46,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
     _nameCtrl      = TextEditingController(text: widget.currentName);
     _shopCtrl      = TextEditingController(text: widget.currentShopName);
     _containerCtrl = TextEditingController(text: widget.currentContainer);
+    _loadCurrentData();
   }
 
   @override
@@ -55,11 +57,92 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
     super.dispose();
   }
 
+  // ── Учурдагы store_type жана market_name жүктөө ──────────────────────────
+  Future<void> _loadCurrentData() async {
+    try {
+      final uid = supabase.auth.currentUser?.id;
+      if (uid == null) return;
+
+      final profile = await supabase
+          .from('profiles')
+          .select('store_type, market_name')
+          .eq('id', uid)
+          .maybeSingle();
+
+      if (profile != null && mounted) {
+        final st = profile['store_type'] as String? ?? 'market';
+        final mn = profile['market_name'] as String?;
+        setState(() {
+          _storeType  = st;
+          _marketName = mn ?? 'Дордой базары';
+        });
+      }
+    } catch (e) {
+      debugPrint('_loadCurrentData: $e');
+    } finally {
+      if (mounted) setState(() => _initLoading = false);
+    }
+  }
+
+  // ── Сактоо ────────────────────────────────────────────────────────────────
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
+    try {
+      final uid = supabase.auth.currentUser?.id;
+      if (uid == null) return;
+
+      // 1) profiles таблицасы — аты, дүкөн түрү, рынок аты
+      await supabase.from('profiles').update({
+        'full_name':   _nameCtrl.text.trim(),
+        'store_type':  _storeType,
+        'market_name': _storeType == 'market' ? _marketName : null,
+      }).eq('id', uid);
+
+      // 2) stores таблицасы — магазин аты, контейнер
+      //    eq('owner_id', uid) — RLS policy "Seller can update own store" болушу керек
+      final storeExists = await supabase
+          .from('stores')
+          .select('id')
+          .eq('owner_id', uid)
+          .maybeSingle();
+
+      if (storeExists != null) {
+        await supabase.from('stores').update({
+          'store_name':       _shopCtrl.text.trim(),
+          'container_number': _containerCtrl.text.trim(),
+        }).eq('owner_id', uid);
+      }
+
+      // 3) profiles'тагы shop_name талаасын дагы жаңырт (SellerModel ошол жерден алат)
+      await supabase.from('profiles').update({
+        'shop_name': _shopCtrl.text.trim(),
+      }).eq('id', uid);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Сакталды!'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Ката: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final loc    = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
+    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final bgColor  = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -67,81 +150,80 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.black),
+          icon: Icon(Icons.arrow_back,
+              color: isDark ? Colors.white : AppColors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          loc.get('edit_profile_title'),
-          style: AppTextStyles.headingMedium.copyWith(
-              color: isDark ? Colors.white : AppColors.black),
-        ),
+        title: Text('Профилди өзгөртүү',
+            style: AppTextStyles.headingMedium.copyWith(
+                color: isDark ? Colors.white : AppColors.black)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildField(loc.get('edit_field_name'), _nameCtrl, isDark),
-            const SizedBox(height: 14),
-            _buildField(loc.get('edit_field_shop'), _shopCtrl, isDark),
-            const SizedBox(height: 14),
-            _buildField(loc.get('edit_field_container'), _containerCtrl, isDark),
-            const SizedBox(height: 24),
-            _buildStoreTypeSelector(isDark, loc),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD97706),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                child: Text(
-                  loc.get('save'),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600),
-                ),
+      body: _initLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD97706)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildField('Сатуучунун аты', _nameCtrl, isDark),
+                  const SizedBox(height: 14),
+                  _buildField('Магазиндин аты', _shopCtrl, isDark),
+                  const SizedBox(height: 14),
+                  _buildField('Контейнер / Жер номери', _containerCtrl, isDark),
+                  const SizedBox(height: 24),
+                  _buildStoreTypeSelector(isDark),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        disabledBackgroundColor:
+                            const Color(0xFFD97706).withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5))
+                          : const Text('Сактоо',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildStoreTypeSelector(bool isDark, AppLocalizations loc) {
+  Widget _buildStoreTypeSelector(bool isDark) {
     final labelColor = isDark ? Colors.white70 : AppColors.grey600;
     final cardBg     = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          loc.get('edit_store_type'),
-          style: AppTextStyles.labelMedium.copyWith(color: labelColor),
-        ),
+        Text('Дүкөн түрү',
+            style: AppTextStyles.labelMedium.copyWith(color: labelColor)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(
-            child: _typeCard('🏪', loc.get('edit_store_market'), 'market', cardBg, isDark),
-          ),
+          Expanded(child: _typeCard('🏪', 'Рынок',      'market',  cardBg, isDark)),
           const SizedBox(width: 12),
-          Expanded(
-            child: _typeCard('🏬', loc.get('edit_store_private'), 'private', cardBg, isDark),
-          ),
+          Expanded(child: _typeCard('🏬', 'Жеке дүкөн', 'private', cardBg, isDark)),
         ]),
         if (_storeType == 'market') ...[
           const SizedBox(height: 16),
-          Text(
-            loc.get('edit_select_market'),
-            style: AppTextStyles.labelMedium.copyWith(color: labelColor),
-          ),
+          Text('Рынок тандаңыз',
+              style: AppTextStyles.labelMedium.copyWith(color: labelColor)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -152,18 +234,15 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _marketName,
+                value: _markets.contains(_marketName) ? _marketName : _markets.first,
                 isExpanded: true,
                 dropdownColor: cardBg,
                 items: _markets
                     .map((m) => DropdownMenuItem(
                           value: m,
-                          child: Text(
-                            m,
-                            style: TextStyle(
-                              color: isDark ? Colors.white : AppColors.black,
-                            ),
-                          ),
+                          child: Text(m,
+                              style: TextStyle(
+                                  color: isDark ? Colors.white : AppColors.black)),
                         ))
                     .toList(),
                 onChanged: (v) => setState(() => _marketName = v),
@@ -188,18 +267,14 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
               : cardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isSelected ? const Color(0xFFD97706) : AppColors.grey300,
+            color: isSelected ? const Color(0xFFD97706) : AppColors.grey300,
             width: isSelected ? 2 : 1,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(icon, style: const TextStyle(fontSize: 26)),
-            const SizedBox(height: 6),
-            Text(
-              label,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(icon, style: const TextStyle(fontSize: 26)),
+          const SizedBox(height: 6),
+          Text(label,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight:
@@ -207,50 +282,10 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
                 color: isSelected
                     ? const Color(0xFFD97706)
                     : (isDark ? Colors.white70 : AppColors.grey600),
-              ),
-            ),
-          ],
-        ),
+              )),
+        ]),
       ),
     );
-  }
-
-  Future<void> _save() async {
-    final loc = AppLocalizations.of(context);
-    try {
-      final uid = supabase.auth.currentUser?.id;
-      if (uid == null) return;
-
-      await supabase.from('profiles').update({
-        'full_name':   _nameCtrl.text.trim(),
-        'store_type':  _storeType,
-        'market_name': _storeType == 'market' ? _marketName : null,
-      }).eq('id', uid);
-
-      await supabase.from('stores').update({
-        'store_name':       _shopCtrl.text.trim(),
-        'container_number': _containerCtrl.text.trim(),
-      }).eq('owner_id', uid);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(loc.get('edit_saved')),
-            backgroundColor: const Color(0xFF16A34A),
-          ),
-        );
-        Navigator.pop(context, true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${loc.get('edit_error')}$e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   Widget _buildField(
@@ -258,11 +293,9 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: AppTextStyles.labelMedium.copyWith(
-              color: isDark ? Colors.white70 : AppColors.grey600),
-        ),
+        Text(label,
+            style: AppTextStyles.labelMedium.copyWith(
+                color: isDark ? Colors.white70 : AppColors.grey600)),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
@@ -270,8 +303,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
               TextStyle(color: isDark ? Colors.white : AppColors.black),
           decoration: InputDecoration(
             filled: true,
-            fillColor:
-                isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

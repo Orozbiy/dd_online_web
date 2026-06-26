@@ -23,6 +23,7 @@ class CategoryList extends StatefulWidget {
 class _CategoryListState extends State<CategoryList> {
   String? _selectedCategoryId;
   String? _selectedSubId;
+  String? _selectedSubItemId; // ← 3-деңгээл
   late List<CategoryModel> _categories;
   ProductFilterMode _filterMode = ProductFilterMode.all;
 
@@ -41,17 +42,30 @@ class _CategoryListState extends State<CategoryList> {
     }
   }
 
+  // Тандалган subcategory (subItems бар-жогун текшерүү үчүн)
+  SubCategoryModel? get _selectedSub {
+    final cat = _selectedCategory;
+    if (cat == null || _selectedSubId == null) return null;
+    try {
+      return cat.subcategories.firstWhere((s) => s.id == _selectedSubId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _onCategoryTap(CategoryModel cat) {
     setState(() {
       if (_selectedCategoryId == cat.id) {
         _selectedCategoryId = null;
-        _selectedSubId = null;
+        _selectedSubId      = null;
+        _selectedSubItemId  = null;
         _filterMode = ProductFilterMode.all;
         widget.onFilterModeChanged?.call(ProductFilterMode.all);
         widget.onCategorySelected('');
       } else {
         _selectedCategoryId = cat.id;
-        _selectedSubId = null;
+        _selectedSubId      = null;
+        _selectedSubItemId  = null;
         widget.onCategorySelected(cat.id);
       }
     });
@@ -59,6 +73,7 @@ class _CategoryListState extends State<CategoryList> {
 
   void _onSubCategoryTap(SubCategoryModel sub) {
     setState(() {
+      _selectedSubItemId = null; // 3-деңгээлди тазалайт
       if (_selectedSubId == sub.id) {
         _selectedSubId = null;
         widget.onCategorySelected(_selectedCategoryId ?? '');
@@ -69,6 +84,18 @@ class _CategoryListState extends State<CategoryList> {
         } else {
           widget.onCategorySelected(sub.id);
         }
+      }
+    });
+  }
+
+  void _onSubItemTap(SubCategoryModel subItem) {
+    setState(() {
+      if (_selectedSubItemId == subItem.id) {
+        _selectedSubItemId = null;
+        widget.onCategorySelected(_selectedSubId ?? _selectedCategoryId ?? '');
+      } else {
+        _selectedSubItemId = subItem.id;
+        widget.onCategorySelected(subItem.id);
       }
     });
   }
@@ -103,13 +130,15 @@ class _CategoryListState extends State<CategoryList> {
   Widget build(BuildContext context) {
     final loc    = AppLocalizations.of(context);
     final cat    = _selectedCategory;
+    final sub    = _selectedSub;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inactiveBg = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
+    final inactiveBg   = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
     final inactiveIcon = isDark ? AppColors.grey400 : AppColors.grey600;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ── 1-сап: Категория / Жаңы / Таанымал ──────────────────────────
         SizedBox(
           height: 52,
           child: SingleChildScrollView(
@@ -119,7 +148,6 @@ class _CategoryListState extends State<CategoryList> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Категория баскычы ──
                 GestureDetector(
                   onTap: _openCategorySheet,
                   child: AnimatedContainer(
@@ -156,7 +184,6 @@ class _CategoryListState extends State<CategoryList> {
                   ),
                 ),
 
-                // ── Жаңы товарлар ──
                 GestureDetector(
                   onTap: () => _setFilterMode(ProductFilterMode.newest),
                   child: AnimatedContainer(
@@ -165,8 +192,7 @@ class _CategoryListState extends State<CategoryList> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                     decoration: BoxDecoration(
                       color: _filterMode == ProductFilterMode.newest
-                          ? const Color(0xFF16A34A)
-                          : inactiveBg,
+                          ? const Color(0xFF16A34A) : inactiveBg,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: _filterMode == ProductFilterMode.newest
                           ? [BoxShadow(color: const Color(0xFF16A34A).withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]
@@ -178,19 +204,16 @@ class _CategoryListState extends State<CategoryList> {
                         Icon(Icons.fiber_new_rounded, size: 16,
                             color: _filterMode == ProductFilterMode.newest ? Colors.white : inactiveIcon),
                         const SizedBox(width: 5),
-                        Text(
-                          loc.get('cat_newest'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: _filterMode == ProductFilterMode.newest ? Colors.white : inactiveIcon,
-                            fontSize: 13,
-                          ),
-                        ),
+                        Text(loc.get('cat_newest'),
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: _filterMode == ProductFilterMode.newest ? Colors.white : inactiveIcon,
+                              fontSize: 13,
+                            )),
                       ],
                     ),
                   ),
                 ),
 
-                // ── Таанымал ──
                 GestureDetector(
                   onTap: () => _setFilterMode(ProductFilterMode.popular),
                   child: AnimatedContainer(
@@ -198,8 +221,7 @@ class _CategoryListState extends State<CategoryList> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                     decoration: BoxDecoration(
                       color: _filterMode == ProductFilterMode.popular
-                          ? const Color(0xFFD97706)
-                          : inactiveBg,
+                          ? const Color(0xFFD97706) : inactiveBg,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: _filterMode == ProductFilterMode.popular
                           ? [BoxShadow(color: const Color(0xFFD97706).withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]
@@ -211,13 +233,11 @@ class _CategoryListState extends State<CategoryList> {
                         Icon(Icons.trending_up_rounded, size: 16,
                             color: _filterMode == ProductFilterMode.popular ? Colors.white : inactiveIcon),
                         const SizedBox(width: 5),
-                        Text(
-                          loc.get('cat_popular'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: _filterMode == ProductFilterMode.popular ? Colors.white : inactiveIcon,
-                            fontSize: 13,
-                          ),
-                        ),
+                        Text(loc.get('cat_popular'),
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: _filterMode == ProductFilterMode.popular ? Colors.white : inactiveIcon,
+                              fontSize: 13,
+                            )),
                       ],
                     ),
                   ),
@@ -227,6 +247,7 @@ class _CategoryListState extends State<CategoryList> {
           ),
         ),
 
+        // ── 2-сап: SubCategory (Эркектер / Аялдар / Балдар ...) ──────────
         AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
@@ -238,11 +259,26 @@ class _CategoryListState extends State<CategoryList> {
                 )
               : const SizedBox.shrink(),
         ),
+
+        // ── 3-сап: SubItems (Жазкы / Жайкы / Күзгү ...) ─────────────────
+        AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          child: sub != null && sub.hasSubItems
+              ? _SubItemBar(
+                  subCategory: sub,
+                  categoryColor: Color(int.parse('0xFF${cat!.color}')),
+                  selectedSubItemId: _selectedSubItemId,
+                  onSubItemTap: _onSubItemTap,
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
 }
 
+// ── 2-деңгээл бар (SubCategoryBar) ──────────────────────────────────────────
 class _SubCategoryBar extends StatelessWidget {
   final CategoryModel category;
   final String? selectedSubId;
@@ -292,28 +328,35 @@ class _SubCategoryBar extends StatelessWidget {
                     ? [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 2))]
                     : [],
               ),
-              child: Builder(
-                builder: (context) {
-                  final loc = AppLocalizations.of(context);
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(sub.icon, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 5),
-                      Text(
-                        sub.localizedName(loc.locale.languageCode),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : color.withValues(alpha: isDark ? 1.0 : 0.85),
-                        ),
+              child: Builder(builder: (context) {
+                final loc = AppLocalizations.of(context);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // subItems бар болсо жебе кошот
+                    Text(sub.icon, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 5),
+                    Text(
+                      sub.localizedName(loc.locale.languageCode),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : color.withValues(alpha: isDark ? 1.0 : 0.85),
+                      ),
+                    ),
+                    if (sub.hasSubItems) ...[
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 14,
+                        color: isSelected ? Colors.white : color.withValues(alpha: 0.7),
                       ),
                     ],
-                  );
-                },
-              ),
+                  ],
+                );
+              }),
             ),
           );
         },
@@ -322,6 +365,94 @@ class _SubCategoryBar extends StatelessWidget {
   }
 }
 
+// ── 3-деңгээл бар (SubItemBar) ───────────────────────────────────────────────
+class _SubItemBar extends StatelessWidget {
+  final SubCategoryModel subCategory;
+  final Color categoryColor;
+  final String? selectedSubItemId;
+  final Function(SubCategoryModel) onSubItemTap;
+
+  const _SubItemBar({
+    required this.subCategory,
+    required this.categoryColor,
+    required this.selectedSubItemId,
+    required this.onSubItemTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 3-деңгээл бир аз ачыкыраак түс менен айырмаланат
+    final color = HSLColor.fromColor(categoryColor)
+        .withLightness((HSLColor.fromColor(categoryColor).lightness + 0.1).clamp(0.0, 1.0))
+        .toColor();
+
+    return Container(
+      height: 44,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF2C2C2C) : AppColors.grey200,
+            width: 1,
+          ),
+        ),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        itemCount: subCategory.subItems.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, i) {
+          final item       = subCategory.subItems[i];
+          final isSelected = selectedSubItemId == item.id;
+          final unselBg    = isDark
+              ? color.withValues(alpha: 0.12)
+              : color.withValues(alpha: 0.07);
+
+          return GestureDetector(
+            onTap: () => onSubItemTap(item),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? color : unselBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? color : color.withValues(alpha: 0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Builder(builder: (context) {
+                final loc = AppLocalizations.of(context);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(item.icon, style: const TextStyle(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.localizedName(loc.locale.languageCode),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : color.withValues(alpha: isDark ? 1.0 : 0.8),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Bottom Sheet ─────────────────────────────────────────────────────────────
 class _CategoryBottomSheet extends StatelessWidget {
   final List<CategoryModel> categories;
   final String? selectedId;
@@ -335,9 +466,9 @@ class _CategoryBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc    = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final maxH   = MediaQuery.of(context).size.height * 0.85;
+    final loc         = AppLocalizations.of(context);
+    final isDark      = Theme.of(context).brightness == Brightness.dark;
+    final maxH        = MediaQuery.of(context).size.height * 0.85;
     final bgColor     = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final handleColor = isDark ? const Color(0xFF3A3A3A) : AppColors.grey300;
     final itemBg      = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
