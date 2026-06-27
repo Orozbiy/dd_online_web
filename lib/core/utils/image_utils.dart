@@ -5,16 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 /// Товар сүрөттөрү үчүн компрессия (мобил + веб)
+/// Веб'де: web_image_picker.dart ичинде Canvas аркылуу JPEG жасалат,
+///         ошондуктан бул жерде веб үчүн эч нерсе кылбайбыз.
 Future<Uint8List> compressImage(
   Uint8List bytes, {
-  int quality   = 60,
-  int maxWidth  = 800,
-  int maxHeight = 800,
+  int quality   = 85,
+  int maxWidth  = 1200,
+  int maxHeight = 1200,
 }) async {
-  if (kIsWeb) {
-    // Веб'де: өлчөмүн кичирейтебиз, JPEG'ке айландыруу Cloudinary тарабынан болот
-    return _resizeWeb(bytes, maxWidth: maxWidth, maxHeight: maxHeight);
-  }
+  if (kIsWeb) return bytes; // веб'де picker ичинде эле сыгылган
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth:  maxWidth,
@@ -28,7 +27,7 @@ Future<Uint8List> compressImage(
 
 /// Чат сүрөттөрү үчүн
 Future<Uint8List> compressChatImage(Uint8List bytes) async {
-  if (kIsWeb) return _resizeWeb(bytes, maxWidth: 600, maxHeight: 600);
+  if (kIsWeb) return bytes;
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth:  600,
@@ -42,7 +41,7 @@ Future<Uint8List> compressChatImage(Uint8List bytes) async {
 
 /// Story сүрөттөрү үчүн
 Future<Uint8List> compressStoryImage(Uint8List bytes) async {
-  if (kIsWeb) return _resizeWeb(bytes, maxWidth: 1080, maxHeight: 1920);
+  if (kIsWeb) return bytes;
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth:  1080,
@@ -56,7 +55,7 @@ Future<Uint8List> compressStoryImage(Uint8List bytes) async {
 
 /// Watermark — мобилде гана (веб'де өткөрүп жиберет)
 Future<Uint8List> addWatermark(Uint8List bytes) async {
-  if (kIsWeb) return bytes; // веб'де watermark жок
+  if (kIsWeb) return bytes;
   try {
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
@@ -111,35 +110,6 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
     }
   } catch (e) {
     debugPrint('⚠️ Watermark ката: $e');
-    return bytes;
-  }
-}
-
-/// Веб'де сүрөт өлчөмүн кичирейтүү (PNG форматта)
-Future<Uint8List> _resizeWeb(
-  Uint8List bytes, {
-  int maxWidth  = 800,
-  int maxHeight = 800,
-}) async {
-  try {
-    final codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth:  maxWidth,
-      targetHeight: maxHeight,
-    );
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    try {
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) return bytes;
-      final result = data.buffer.asUint8List();
-      debugPrint('🗜 Web resize: ${bytes.length ~/ 1024}KB → ${result.length ~/ 1024}KB');
-      return result;
-    } finally {
-      image.dispose();
-    }
-  } catch (e) {
-    debugPrint('⚠️ Web resize ката: $e');
     return bytes;
   }
 }
