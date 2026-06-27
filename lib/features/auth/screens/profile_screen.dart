@@ -1,13 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/auth_service.dart';
 import '../../../core/supabase_client.dart';
 import 'welcome_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -64,29 +64,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _pickAndUploadAvatar() async {
-    final loc    = AppLocalizations.of(context);
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 512);
-    if (picked == null) return;
+ Future<void> _pickAndUploadAvatar() async {
+  final loc    = AppLocalizations.of(context);
+  final picker = ImagePicker();
+  final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 512);
+  if (picked == null) return;
 
-    setState(() => _isUploadingPhoto = true);
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-      final file        = File(picked.path);
-      final storagePath = 'avatars/${user.id}.jpg';
-      await supabase.storage.from('product-images').upload(storagePath, file, fileOptions: const FileOptions(upsert: true));
-      final url = supabase.storage.from('product-images').getPublicUrl(storagePath);
-      await supabase.from('profiles').update({'avatar_url': url}).eq('id', user.id);
-      setState(() => _avatarUrl = url);
-      if (mounted) _showSnack(loc.get('profile_photo_updated'), success: true);
-    } catch (e) {
-      if (mounted) _showSnack('${AppLocalizations.of(context).get('error')}: $e');
-    } finally {
-      if (mounted) setState(() => _isUploadingPhoto = false);
+  setState(() => _isUploadingPhoto = true);
+  try {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    // ✅ Blob URL маселесин чечет — path эмес, bytes окуйбуз
+    final bytes = await picked.readAsBytes();
+
+    // Cloudinary'га жүктөө
+    const cloudName    = 'dedwm4krp';
+    const uploadPreset = 'dd-online';
+    final uri     = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..fields['upload_preset'] = uploadPreset
+      ..files.add(http.MultipartFile.fromBytes(
+        'file', bytes,
+        filename: 'avatar_${user.id}.jpg',
+      ));
+
+    final streamed  = await request.send().timeout(const Duration(seconds: 60));
+    final response  = await http.Response.fromStream(streamed);
+
+    if (response.statusCode != 200) {
+      if (mounted) _showSnack('${loc.get('error')}: upload failed');
+      return;
     }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final url  = data['secure_url'] as String;
+
+    await supabase.from('profiles').update({'avatar_url': url}).eq('id', user.id);
+    setState(() => _avatarUrl = url);
+    if (mounted) _showSnack(loc.get('profile_photo_updated'), success: true);
+  } catch (e) {
+    if (mounted) _showSnack('${loc.get('error')}: $e');
+  } finally {
+    if (mounted) setState(() => _isUploadingPhoto = false);
   }
+}
 
   Future<void> _saveProfile() async {
     final loc      = AppLocalizations.of(context);
