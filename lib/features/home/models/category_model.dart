@@ -72,18 +72,7 @@ class CategoryModel {
           SubCategoryModel(id: '1_5',  name: 'Мектеп формасы', nameRu: 'Школьная форма',  icon: '🏫'),
           SubCategoryModel(id: '1_9',  name: 'Жумушчу кийим',  nameRu: 'Рабочая одежда', icon: '🦺'),
           SubCategoryModel(id: '1_10', name: 'Улуттук кийим',  nameRu: 'Национальная',   icon: '🪭'),
-          SubCategoryModel(
-            id: '1_11', name: 'Баш кийим', nameRu: 'Головные уборы', icon: '🧢',
-            subItems: [
-              SubCategoryModel(id: '1_11_1', name: 'Эркектер',          nameRu: 'Мужские',      icon: '🎩'),
-              SubCategoryModel(id: '1_11_2', name: 'Аялдар',            nameRu: 'Женские',      icon: '👒'),
-              SubCategoryModel(id: '1_11_3', name: 'Балдар',            nameRu: 'Детские',      icon: '🧒'),
-              SubCategoryModel(id: '1_11_4', name: 'Кышкы баш кийим',  nameRu: 'Зимние',       icon: '❄️'),
-              SubCategoryModel(id: '1_11_5', name: 'Жайкы баш кийим',  nameRu: 'Летние',       icon: '☀️'),
-              SubCategoryModel(id: '1_11_6', name: 'Спорт',             nameRu: 'Спортивные',   icon: '🏋️'),
-              SubCategoryModel(id: '1_11_7', name: 'Улуттук баш кийим', nameRu: 'Национальные', icon: '🪭'),
-            ],
-          ),
+          SubCategoryModel(id: '1_11', name: 'Жоолук/Шарф', nameRu: 'Платок/Шарф', icon: '🧣'),
         ],
       ),
 
@@ -141,9 +130,7 @@ class CategoryModel {
           SubCategoryModel(id: '3_4', name: 'Көз айнек',   nameRu: 'Очки',         icon: '🕶️'),
           SubCategoryModel(id: '3_5', name: 'Зергерчилик', nameRu: 'Украшения',    icon: '💍'),
           SubCategoryModel(id: '3_6', name: 'Кемер',       nameRu: 'Ремень',       icon: '🪢'),
-          SubCategoryModel(id: '3_7', name: 'Жоолук/Шарф', nameRu: 'Платок/Шарф', icon: '🧣'),
-          SubCategoryModel(id: '3_8', name: 'Перчатка',    nameRu: 'Перчатки',     icon: '🧤'),
-          SubCategoryModel(id: '3_9', name: 'Баш кийим',   nameRu: 'Головные уборы',icon: '🧢'),
+          SubCategoryModel(id: '3_7', name: 'Перчатка', nameRu: 'Перчатки', icon: '🧤'),
         ],
       ),
 

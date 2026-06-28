@@ -80,7 +80,7 @@ class _SuggestionButtonState extends State<SuggestionButton> {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? const Color.fromARGB(255, 217, 186, 151).withValues(alpha: 0.1)
               : Colors.grey.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
@@ -172,7 +172,7 @@ class _SuggestionButtonState extends State<SuggestionButton> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: const Color.fromARGB(255, 49, 208, 38),
                       disabledBackgroundColor:
                           Colors.grey.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(
