@@ -30,16 +30,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900));
+        vsync: this, duration: const Duration(milliseconds: 600)); // 900→600
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _controller.forward();
 
     _authSub = AuthService.instance.authStateChanges.listen((data) async {
       if (data.event == AuthChangeEvent.signedIn) {
 
-        // ✅ ТЕЗДЕТҮҮ: syncProfile() күтпөй дароо HomeScreen'ге өт
+        // ✅ 1. Дароо HomeScreen'ге өт — эч network call күтпөйбүз
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
@@ -47,32 +47,40 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           (route) => false,
         );
 
-        // ✅ Фондо: profile sync + role текшерүү (экранды ТОКТОТПОЙТ)
-        final user = AuthService.instance.currentUser;
-        if (user != null) {
-          // await жок — фондо иштейт
-          AuthService.instance.syncProfile();
-
-          try {
-            final profile = await supabase
-                .from('profiles')
-                .select('role, seller_status')
-                .eq('id', user.id)
-                .maybeSingle();
-            final role = profile?['role'] as String?;
-            final sellerStatus = profile?['seller_status'] as String?;
-            if (role != 'seller' && sellerStatus != null) {
-              await supabase
-                  .from('profiles')
-                  .update({'seller_status': null}).eq('id', user.id);
-            }
-          } catch (_) {}
-        }
+        // ✅ 2. Фондо: context колдонбостон, коопсуз иштейт
+        _runBackgroundTasks();
 
       } else if (data.event == AuthChangeEvent.signedOut && mounted) {
         setState(() => _isLoading = false);
       }
     });
+  }
+
+  /// Context'ке жараксыз — фондо коопсуз иштейт
+  void _runBackgroundTasks() {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
+    // syncProfile — await жок, фондо
+    AuthService.instance.syncProfile().catchError((_) {});
+
+    // Role cleanup — фондо, context'ке тийбейт
+    supabase
+        .from('profiles')
+        .select('role, seller_status')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then((profile) {
+      final role         = profile?['role'] as String?;
+      final sellerStatus = profile?['seller_status'] as String?;
+      if (role != 'seller' && sellerStatus != null) {
+        supabase
+            .from('profiles')
+            .update({'seller_status': null})
+            .eq('id', user.id)
+            .catchError((_) {});
+      }
+    }).catchError((_) {});
   }
 
   @override
@@ -86,6 +94,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     setState(() => _isLoading = true);
     try {
       await AuthService.instance.signInWithGoogle();
+      // Веб: OAuth redirect болот, loading state'и _authSub'да тазаланат
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) {
@@ -129,7 +138,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                   // ── ЛОГОТИП ──
                   Container(
-                    width: 88, height: 88,
+                    width: 88,
+                    height: 88,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFFD97706), Color(0xFFEF4444)],
@@ -137,11 +147,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: [BoxShadow(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.35),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      )],
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        )
+                      ],
                     ),
                     child: const Icon(Icons.storefront_rounded,
                         color: Colors.white, size: 44),
@@ -210,21 +222,21 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           decoration: BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            )],
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.storefront_rounded,
-                  color: Colors.white, size: 22),
+              const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
               const SizedBox(width: 12),
               Text(loc.get('seller_login'),
-                  style: AppTextStyles.headingSmall
-                      .copyWith(color: Colors.white)),
+                  style: AppTextStyles.headingSmall.copyWith(color: Colors.white)),
             ],
           ),
         ),
@@ -245,11 +257,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           color: btnColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: btnBorder, width: 1.5),
-          boxShadow: [BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: _isLoading
             ? const Center(
@@ -313,10 +327,10 @@ class _GoogleGPainter extends CustomPainter {
       );
     }
 
-    drawArc(-90, 90, const Color(0xFF4285F4));
-    drawArc(0,   90, const Color(0xFF34A853));
-    drawArc(90,  90, const Color(0xFFFBBC05));
-    drawArc(180, 90, const Color(0xFFEA4335));
+    drawArc(-90, 90, const Color.fromARGB(255, 16, 74, 169));
+    drawArc(0,   90, const Color.fromARGB(255, 20, 110, 44));
+    drawArc(90,  90, const Color.fromARGB(255, 136, 105, 13));
+    drawArc(180, 90, const Color.fromARGB(255, 148, 34, 24));
   }
 
   @override

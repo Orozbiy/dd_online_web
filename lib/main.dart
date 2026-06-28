@@ -15,7 +15,7 @@ import 'core/active_status_tracker.dart';
 import 'package:flutter/foundation.dart';
 import 'core/locale_provider.dart';
 import 'core/app_localizations.dart';
-import 'core/theme_provider.dart'; // ← ЖАҢЫ
+import 'core/theme_provider.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -26,7 +26,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  debugPrint('🚀 MAIN БАШТАЛДЫ');
 
   if (defaultTargetPlatform != TargetPlatform.windows) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -34,26 +33,22 @@ Future<void> main() async {
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  debugPrint('🚀 Supabase init...');
-  await SupabaseInit.init();
+  // ✅ Supabase + Firebase ПАРАЛЛЕЛДҮҮ — эки эсе тез
+  await Future.wait([
+    SupabaseInit.init(),
+    _initFirebase(),
+  ]);
 
-  debugPrint('🚀 Firebase init...');
-  await _initFirebase();
-
-  debugPrint('🚀 Cart & Favorites...');
-  await CartManager.instance.loadFromPrefs();
-  await FavoritesManager().loadFromPrefs();
-
-  debugPrint('🚀 saveMyToken...');
+  // ✅ Cart & Favorites фондо жүктөлөт — app'ты токтотпойт
+  unawaited(CartManager.instance.loadFromPrefs());
+  unawaited(FavoritesManager().loadFromPrefs());
   unawaited(NotificationService().saveMyToken());
 
-  debugPrint('🚀 runApp...');
   runApp(const ActiveStatusTracker(child: DDOnlineApp()));
 }
 
 Future<void> _initFirebase() async {
   try {
-    debugPrint('🚀 _initFirebase башталды');
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -61,9 +56,7 @@ Future<void> _initFirebase() async {
     } catch (e) {
       debugPrint('🔥 Firebase мурда init болгон, улантабыз');
     }
-    debugPrint('🚀 Firebase init болду');
     await NotificationService().init();
-    debugPrint('🚀 NotificationService init болду');
   } catch (e) {
     debugPrint('⚠️ Firebase init ката: $e');
   }
@@ -82,7 +75,7 @@ class DDOnlineApp extends StatefulWidget {
 
 class _DDOnlineAppState extends State<DDOnlineApp> {
   final _localeProvider = LocaleProvider();
-  final _themeProvider = ThemeProvider(); // ← ЖАҢЫ
+  final _themeProvider = ThemeProvider();
 
   @override
   void initState() {
@@ -90,16 +83,16 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
     _localeProvider.loadSavedLocale();
     _localeProvider.addListener(() => setState(() {}));
 
-    _themeProvider.loadSavedTheme(); // ← ЖАҢЫ
-    _themeProvider.addListener(() => setState(() {})); // ← ЖАҢЫ
+    _themeProvider.loadSavedTheme();
+    _themeProvider.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _localeProvider.removeListener(() => setState(() {}));
     _localeProvider.dispose();
-    _themeProvider.removeListener(() => setState(() {})); // ← ЖАҢЫ
-    _themeProvider.dispose(); // ← ЖАҢЫ
+    _themeProvider.removeListener(() => setState(() {}));
+    _themeProvider.dispose();
     super.dispose();
   }
 
@@ -115,8 +108,8 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
           title: 'DD Online',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme, // ← ЖАҢЫ
-          themeMode: _themeProvider.themeMode, // ← ЖАҢЫ
+          darkTheme: AppTheme.darkTheme,
+          themeMode: _themeProvider.themeMode,
           navigatorKey: navigatorKey,
           locale: _localeProvider.locale,
           supportedLocales: const [Locale('ky'), Locale('ru')],
@@ -134,7 +127,7 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
 }
 
 // ══════════════════════════════════════════════════════
-// THEME SCOPE — ЖАҢЫ
+// THEME SCOPE
 // ══════════════════════════════════════════════════════
 class ThemeScope extends InheritedWidget {
   final ThemeProvider provider;
@@ -209,7 +202,8 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 
   Future<Widget> _getTargetScreen() async {
-    final user = supabase.auth.currentSession?.user;
+    // ✅ currentUser — network call жок, кэштен алат, заматта иштейт
+    final user = supabase.auth.currentUser;
     if (user != null) return const HomeScreen();
     return const WelcomeScreen();
   }
@@ -248,7 +242,8 @@ class _SplashScreenState extends State<_SplashScreen>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      // ✅ 600ms → 300ms: анимация эки эсе тез
+      duration: const Duration(milliseconds: 300),
     );
     _scaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
