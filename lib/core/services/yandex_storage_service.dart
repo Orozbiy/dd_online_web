@@ -21,7 +21,7 @@ class YandexStorageService {
   // Туура:   https://s3.eu-central-003.backblazeb2.com/dd-online-media/products/xxx.jpg
   // Мурда (КАТА): https://dd-online-media.s3.eu-central-003.backblazeb2.com/products/xxx.jpg
   static String publicUrl(String objectKey) =>
-      '$_endpoint/$_bucket/$objectKey';
+      'https://$_bucket.$_host/$objectKey';
 
   // ── Сүрөт жүктөө ──
   Future<String?> uploadImage(

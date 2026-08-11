@@ -19,13 +19,9 @@ import 'features/home/screens/home_screen.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
 
-// ✅ prefix оңдолду: update_checker (underscore эмес)
 import 'core/update_checker_stub.dart'
     if (dart.library.html) 'core/update_checker_stub.dart' as update_checker;
 
-// ──────────────────────────────────────────────────────
-// Background FCM handler — мобайл гана
-// ──────────────────────────────────────────────────────
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -44,10 +40,15 @@ Future<void> main() async {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
+  // ✅ Supabase — дайыма күтөбүз (тез)
   await SupabaseInit.init();
-  await _initFirebase();
 
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    // ✅ ВЕБ: Firebase'ди ФОНДО иштет — загрузканы токтотпойт
+    _initFirebase().catchError((e) => debugPrint('⚠️ Firebase web: $e'));
+  } else {
+    // ✅ МОБИЛ: Firebase'ди күтөбүз — push notification үчүн керек
+    await _initFirebase();
     await NotificationService().handleInitialMessage();
   }
 
@@ -120,7 +121,7 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
           theme:                       AppTheme.lightTheme,
           darkTheme:                   AppTheme.darkTheme,
           themeMode:                   _themeProvider.themeMode,
-          navigatorKey: navigatorKey,
+          navigatorKey:                navigatorKey,
           locale:                      _localeProvider.locale,
           supportedLocales: const     [Locale('ky'), Locale('ru')],
           localizationsDelegates: const [
@@ -292,8 +293,7 @@ class _SplashScreenState extends State<_SplashScreen>
         vsync: this, duration: const Duration(milliseconds: 600));
     _scaleAnim = Tween<double>(begin: 0.85, end: 1.0)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
-    _fadeAnim =
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _fadeAnim  = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _ctrl.forward();
   }
 
@@ -315,49 +315,49 @@ class _SplashScreenState extends State<_SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 96, height: 96,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFD97706), Color(0xFFEF4444)],
-                          begin:  Alignment.topLeft,
-                          end:    Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: const Icon(Icons.storefront_rounded,
-                          color: Colors.white, size: 46),
+                Container(
+                  width: 96, height: 96,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD97706), Color(0xFFEF4444)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    Positioned(
-                      bottom: -10, right: -10,
-                      child: Container(
-                        width: 34, height: 34,
-                        decoration: BoxDecoration(
-                          color:        const Color(0xFF1A1A1A),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: const Color(0xFFD97706), width: 2),
-                        ),
-                        child: const Icon(Icons.navigation_rounded,
-                            color: Color(0xFFD97706), size: 18),
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.4),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: const Icon(Icons.storefront_rounded,
+                      color: Colors.white, size: 52),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'DD Online',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Дордойдун онлайн базары',
+                  style: TextStyle(color: Color(0xFF888888), fontSize: 13),
                 ),
                 const SizedBox(height: 32),
-                const Text('DD Online',
-                    style: TextStyle(
-                        color:         Colors.white,
-                        fontSize:      28,
-                        fontWeight:    FontWeight.w800,
-                        letterSpacing: 0.5)),
-                const SizedBox(height: 8),
-                const Text('Дордой базары',
-                    style: TextStyle(
-                        color: Color(0xFF888888), fontSize: 14)),
+                const SizedBox(
+                  width: 24, height: 24,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFFD97706),
+                    strokeWidth: 2.5,
+                  ),
+                ),
               ],
             ),
           ),

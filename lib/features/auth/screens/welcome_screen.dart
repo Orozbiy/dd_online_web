@@ -9,6 +9,7 @@ import '../../../core/app_localizations.dart';
 import '../../../core/auth_service.dart';
 import '../../home/screens/home_screen.dart';
 import '../../seller/screens/seller_login_screen.dart';
+import '../../seller/screens/seller_entrance_screen.dart';
 import '../../../core/supabase_client.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -25,9 +26,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<Offset> _slideAnim;
 
   bool _isLoading = false;
-  bool _navigated = false; // ← кайра навигация болбосун үчүн
+  bool _navigated = false;
   StreamSubscription<AuthState>? _authSub;
-  Timer? _loadingTimeoutTimer; // ← timeout таймери
+  Timer? _loadingTimeoutTimer;
 
   @override
   void initState() {
@@ -41,15 +42,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _controller.forward();
 
     _authSub = AuthService.instance.authStateChanges.listen((data) async {
-      // ✅ Бир жолу гана навигация
       if (data.event == AuthChangeEvent.signedIn) {
         if (!mounted || _navigated) return;
         _navigated = true;
 
-        // Timeout таймерин токтот
         _loadingTimeoutTimer?.cancel();
 
-        // Дароо HomeScreen'ге өт — жүктөлүүнү күтпө
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
@@ -58,15 +56,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           );
         }
 
-        // ✅ Фондо: FCM токен + profile sync (экранды ТОКТОТПОЙТ)
         final user = AuthService.instance.currentUser;
         if (user != null) {
-          // FCM токенди дароо сакта (await жок)
           NotificationService().saveMyToken();
-          // Profile маалыматын синхрондо (await жок)
           AuthService.instance.syncProfile();
-
-          // Seller_status текшерүү (фондо)
           _checkAndFixSellerStatus(user.id);
         }
       } else if (data.event == AuthChangeEvent.signedOut) {
@@ -81,7 +74,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
   }
 
-  /// Seller_status ролун фондо текшерип оңдойт
   Future<void> _checkAndFixSellerStatus(String userId) async {
     try {
       final profile = await supabase
@@ -96,9 +88,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             .from('profiles')
             .update({'seller_status': null}).eq('id', userId);
       }
-    } catch (_) {
-      // Ката болсо унчукпайбыз
-    }
+    } catch (_) {}
   }
 
   @override
@@ -110,15 +100,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _handleGoogleSignIn() async {
-    if (_isLoading) return; // Кош басуудан коргоо
+    if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
       _navigated = false;
     });
 
-    // ✅ TIMEOUT: 60 секундан кийин загрузканы токтот
-    // Колдонуучу браузерди жаап кетсе же ката болсо
     _loadingTimeoutTimer?.cancel();
     _loadingTimeoutTimer = Timer(const Duration(seconds: 60), () {
       if (mounted && _isLoading) {
@@ -133,10 +121,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     try {
       await AuthService.instance.signInWithGoogle();
-      // ✅ МААНИЛҮҮ: мында _isLoading = false КОЮЛБАЙТ!
-      // Себеби: signInWithGoogle() браузерди ачат жана дароо кайтат.
-      // Чыныгы кириш authStateChanges listener'де болот.
-      // Ал жерде _isLoading жана navigate башкарылат.
     } catch (e) {
       _loadingTimeoutTimer?.cancel();
       if (mounted) {
@@ -231,12 +215,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                   const Spacer(flex: 2),
 
-                  // ── КИРҮҮ БАСКЫЧЫ ──
+                  // ── GOOGLE КИРҮҮ БАСКЫЧЫ ──
                   _buildGoogleButton(loc, isDark),
 
                   const SizedBox(height: 16),
 
-                  // ✅ Загрузка учурунда жардам текст
                   if (_isLoading)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -255,6 +238,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     textAlign: TextAlign.center,
                   ),
 
+                  const SizedBox(height: 12),
+
+                  // ── САТУУЧУ БАСКЫЧЫ ──
+                  _buildSellerButton(loc, isDark),
+
                   const SizedBox(height: 32),
                 ],
               ),
@@ -265,8 +253,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  // ── Google баскычы ──
   Widget _buildGoogleButton(AppLocalizations loc, bool isDark) {
-    // Windows үчүн Seller Login баскычы
     if (defaultTargetPlatform == TargetPlatform.windows) {
       return GestureDetector(
         onTap: () => Navigator.push(context,
@@ -289,12 +277,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.storefront_rounded,
-                  color: Colors.white, size: 22),
+              const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
               const SizedBox(width: 12),
               Text(loc.get('seller_login'),
-                  style:
-                      AppTextStyles.headingSmall.copyWith(color: Colors.white)),
+                  style: AppTextStyles.headingSmall.copyWith(color: Colors.white)),
             ],
           ),
         ),
@@ -342,8 +328,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Кирүү жүрүп жатат...',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.grey500),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500),
                   ),
                 ],
               )
@@ -353,10 +338,42 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   const _GoogleLogo(),
                   const SizedBox(width: 12),
                   Text(loc.get('sign_in_google'),
-                      style: AppTextStyles.headingSmall
-                          .copyWith(color: textColor)),
+                      style: AppTextStyles.headingSmall.copyWith(color: textColor)),
                 ],
               ),
+      ),
+    );
+  }
+
+  // ── Сатуучу баскычы ──
+  Widget _buildSellerButton(AppLocalizations loc, bool isDark) {
+    final btnBorder = isDark ? const Color(0xFF3A3A3A) : AppColors.grey200;
+    final textColor = isDark ? Colors.white70 : AppColors.grey600;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SellerEntranceScreen()),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: btnBorder, width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              loc.get('seller_login'),
+              style: AppTextStyles.headingSmall.copyWith(color: textColor),
+            ),
+          ],
+        ),
       ),
     );
   }
