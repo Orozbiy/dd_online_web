@@ -34,7 +34,7 @@ class _ProductCardState extends State<ProductCard>
     super.initState();
     _heartController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 30),
+      duration: const Duration(milliseconds: 300),
     );
     _heartAnim = Tween<double>(begin: 1.0, end: 1.35).animate(
       CurvedAnimation(parent: _heartController, curve: Curves.elasticOut),
@@ -53,11 +53,32 @@ class _ProductCardState extends State<ProductCard>
     setState(() {});
   }
 
+  /// ✅ ОҢДОЛДУ: Backblaze + Cloudinary + Supabase URL'дарын туура иштетет
   String _thumbUrl(String url) {
+    if (url.isEmpty) return url;
+
+    // Cloudinary — thumbnail optimize
     if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
       return url.replaceFirst('/upload/', '/upload/w_300,q_auto,f_auto/');
     }
+
+    // Backblaze B2 — URL'и өзгөртүүсүз (туура иштейт)
+    if (url.contains('backblazeb2.com') || url.contains('s3.eu-central-003')) {
+      return url;
+    }
+
+    // Supabase Storage — эски URL'дар (өзгөртүүсүз кайтарат)
+    if (url.contains('supabase.co/storage')) {
+      return url;
+    }
+
     return url;
+  }
+
+  /// ✅ ЖАҢЫ: URL жарактуубу текшерүү
+  bool _isValidUrl(String url) {
+    if (url.isEmpty) return false;
+    return url.startsWith('http://') || url.startsWith('https://');
   }
 
   @override
@@ -77,6 +98,10 @@ class _ProductCardState extends State<ProductCard>
             .round()
         : 0;
     final isNew = widget.product.isNew;
+
+    // ✅ ОҢДОЛДУ: imageUrl бош же жараксыз болсо placeholder көрсөт
+    final imageUrl = _thumbUrl(widget.product.imageUrl);
+    final hasImage = _isValidUrl(imageUrl);
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -99,8 +124,7 @@ class _ProductCardState extends State<ProductCard>
                 boxShadow: isDark
                     ? [
                         BoxShadow(
-                            color:
-                                const Color(0xFF3D2080).withValues(alpha: 0.15),
+                            color: const Color(0xFF3D2080).withValues(alpha: 0.15),
                             blurRadius: 12,
                             offset: const Offset(0, 4)),
                       ]
@@ -126,30 +150,51 @@ class _ProductCardState extends State<ProductCard>
                   children: [
                     // ── Сүрөт ──
                     ClipRRect(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(18)),
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(18)),
                       child: SizedBox(
                         width: cardWidth,
                         height: imgHeight,
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
+                            // Shimmer фон
                             Container(color: shimmerColor),
-                            CachedNetworkImage(
-                              imageUrl: _thumbUrl(widget.product.imageUrl),
-                              fit: BoxFit.cover,
-                              fadeInDuration: const Duration(milliseconds: 100),
-                              memCacheWidth: 300,
-                              placeholder: (_, __) => const SizedBox.shrink(),
-                              errorWidget: (_, __, ___) => Container(
-                                color: shimmerColor,
-                                child: Icon(Icons.image_not_supported_outlined,
-                                    color: isDark
-                                        ? Colors.white24
-                                        : AppColors.grey300,
-                                    size: 32),
-                              ),
-                            ),
+
+                            // ✅ ОҢДОЛДУ: URL жок болсо placeholder, бар болсо сүрөт
+                            if (hasImage)
+                              CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                fadeInDuration:
+                                    const Duration(milliseconds: 200),
+                                memCacheWidth: 300,
+                                placeholder: (_, __) => Container(
+                                  color: shimmerColor,
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: isDark
+                                            ? Colors.white24
+                                            : AppColors.grey300,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (_, url, error) {
+                                  debugPrint('🖼️ Сүрөт жүктөлбөдү: $url | $error');
+                                  return _NoImagePlaceholder(
+                                      isDark: isDark,
+                                      shimmerColor: shimmerColor);
+                                },
+                              )
+                            else
+                              _NoImagePlaceholder(
+                                  isDark: isDark,
+                                  shimmerColor: shimmerColor),
 
                             // Discount badge
                             if (hasDiscount)
@@ -163,11 +208,13 @@ class _ProductCardState extends State<ProductCard>
                                     color: AppColors.error,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Text('-$discountPct%',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    '-$discountPct%',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
 
@@ -183,14 +230,17 @@ class _ProductCardState extends State<ProductCard>
                                     color: AppColors.success,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Text('Жаңы',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold)),
+                                  child: const Text(
+                                    'Жаңы',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
 
+                            // Favorite баскычы
                             Positioned(
                               top: 6,
                               right: 6,
@@ -199,7 +249,8 @@ class _ProductCardState extends State<ProductCard>
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: isDark ? _CardC.favBg : Colors.white,
+                                    color:
+                                        isDark ? _CardC.favBg : Colors.white,
                                     shape: BoxShape.circle,
                                     border: isDark
                                         ? Border.all(
@@ -245,6 +296,7 @@ class _ProductCardState extends State<ProductCard>
                           mainAxisAlignment: MainAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Товар аты
                             Text(
                               widget.product.name,
                               maxLines: 2,
@@ -257,6 +309,8 @@ class _ProductCardState extends State<ProductCard>
                               ),
                             ),
                             const SizedBox(height: 4),
+
+                            // Баасы
                             if (hasDiscount) ...[
                               Text(
                                 '${widget.product.price.toStringAsFixed(0)} сом',
@@ -269,23 +323,26 @@ class _ProductCardState extends State<ProductCard>
                               ),
                               Text(
                                 '${widget.product.discountedPrice!.toStringAsFixed(0)} сом',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.error, // ← кызыл болду
+                                  color: AppColors.error,
                                 ),
                               ),
                             ] else ...[
                               Text(
                                 '${widget.product.price.toStringAsFixed(0)} сом',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.primary,
                                 ),
                               ),
                             ],
+
                             const Spacer(),
+
+                            // Рейтинг + negotiation badge
                             Row(
                               children: [
                                 if (rating > 0) ...[
@@ -310,10 +367,50 @@ class _ProductCardState extends State<ProductCard>
                       ),
                     ),
                   ],
-                ), // ← Column жабылат
-              ), // ← Column жабылат
+                ),
+              ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// ✅ ЖАҢЫ: Сүрөт жок болгондо placeholder виджет
+// ══════════════════════════════════════════════════════
+class _NoImagePlaceholder extends StatelessWidget {
+  final bool isDark;
+  final Color shimmerColor;
+
+  const _NoImagePlaceholder({
+    required this.isDark,
+    required this.shimmerColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: shimmerColor,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_outlined,
+              color: isDark ? Colors.white24 : AppColors.grey300,
+              size: 36,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Сүрөт жок',
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white24 : AppColors.grey300,
+              ),
+            ),
+          ],
         ),
       ),
     );

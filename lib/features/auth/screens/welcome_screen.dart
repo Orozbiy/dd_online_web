@@ -25,11 +25,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<Offset> _slideAnim;
 
   bool _isLoading = false;
+  bool _navigated = false; // ← кайра навигация болбосун үчүн
   StreamSubscription<AuthState>? _authSub;
+  Timer? _loadingTimeoutTimer; // ← timeout таймери
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 900));
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
@@ -38,58 +41,104 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _controller.forward();
 
     _authSub = AuthService.instance.authStateChanges.listen((data) async {
+      // ✅ Бир жолу гана навигация
       if (data.event == AuthChangeEvent.signedIn) {
+        if (!mounted || _navigated) return;
+        _navigated = true;
 
-        // ✅ ТЕЗДЕТҮҮ: syncProfile() күтпөй дароо HomeScreen'ге өт
-        if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+        // Timeout таймерин токтот
+        _loadingTimeoutTimer?.cancel();
 
-        // ✅ Фондо: profile sync + role текшерүү (экранды ТОКТОТПОЙТ)
-      final user = AuthService.instance.currentUser;
-if (user != null) {
-  // ✅ syncProfile фондо, бирок токен ДАРОО сакталсын
-  NotificationService().saveMyToken(); // await жок — фондо, бирок HomeScreen'ден мурун башталат
-  AuthService.instance.syncProfile();  // await жок — фондо
-
-          try {
-            final profile = await supabase
-                .from('profiles')
-                .select('role, seller_status')
-                .eq('id', user.id)
-                .maybeSingle();
-            final role = profile?['role'] as String?;
-            final sellerStatus = profile?['seller_status'] as String?;
-            if (role != 'seller' && sellerStatus != null) {
-              await supabase
-                  .from('profiles')
-                  .update({'seller_status': null}).eq('id', user.id);
-            }
-          } catch (_) {}
+        // Дароо HomeScreen'ге өт — жүктөлүүнү күтпө
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
         }
 
-      } else if (data.event == AuthChangeEvent.signedOut && mounted) {
-        setState(() => _isLoading = false);
+        // ✅ Фондо: FCM токен + profile sync (экранды ТОКТОТПОЙТ)
+        final user = AuthService.instance.currentUser;
+        if (user != null) {
+          // FCM токенди дароо сакта (await жок)
+          NotificationService().saveMyToken();
+          // Profile маалыматын синхрондо (await жок)
+          AuthService.instance.syncProfile();
+
+          // Seller_status текшерүү (фондо)
+          _checkAndFixSellerStatus(user.id);
+        }
+      } else if (data.event == AuthChangeEvent.signedOut) {
+        if (mounted) {
+          _loadingTimeoutTimer?.cancel();
+          setState(() {
+            _isLoading = false;
+            _navigated = false;
+          });
+        }
       }
     });
   }
 
+  /// Seller_status ролун фондо текшерип оңдойт
+  Future<void> _checkAndFixSellerStatus(String userId) async {
+    try {
+      final profile = await supabase
+          .from('profiles')
+          .select('role, seller_status')
+          .eq('id', userId)
+          .maybeSingle();
+      final role = profile?['role'] as String?;
+      final sellerStatus = profile?['seller_status'] as String?;
+      if (role != 'seller' && sellerStatus != null) {
+        await supabase
+            .from('profiles')
+            .update({'seller_status': null}).eq('id', userId);
+      }
+    } catch (_) {
+      // Ката болсо унчукпайбыз
+    }
+  }
+
   @override
   void dispose() {
+    _loadingTimeoutTimer?.cancel();
     _controller.dispose();
     _authSub?.cancel();
     super.dispose();
   }
 
   Future<void> _handleGoogleSignIn() async {
-    setState(() => _isLoading = true);
+    if (_isLoading) return; // Кош басуудан коргоо
+
+    setState(() {
+      _isLoading = true;
+      _navigated = false;
+    });
+
+    // ✅ TIMEOUT: 60 секундан кийин загрузканы токтот
+    // Колдонуучу браузерди жаап кетсе же ката болсо
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = Timer(const Duration(seconds: 60), () {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+        _showSnack(
+          AppLocalizations.of(context).get('login_error') +
+              ': Убакыт бүттү. Кайра аракет кылыңыз.',
+          isError: true,
+        );
+      }
+    });
+
     try {
       await AuthService.instance.signInWithGoogle();
-      if (mounted) setState(() => _isLoading = false);
+      // ✅ МААНИЛҮҮ: мында _isLoading = false КОЮЛБАЙТ!
+      // Себеби: signInWithGoogle() браузерди ачат жана дароо кайтат.
+      // Чыныгы кириш authStateChanges listener'де болот.
+      // Ал жерде _isLoading жана navigate башкарылат.
     } catch (e) {
+      _loadingTimeoutTimer?.cancel();
       if (mounted) {
         setState(() => _isLoading = false);
         final loc = AppLocalizations.of(context);
@@ -99,6 +148,7 @@ if (user != null) {
   }
 
   void _showSnack(String msg, {bool isError = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       backgroundColor: isError ? AppColors.error : AppColors.primary,
@@ -110,8 +160,8 @@ if (user != null) {
 
   @override
   Widget build(BuildContext context) {
-    final loc    = AppLocalizations.of(context);
-    final theme  = Theme.of(context);
+    final loc = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF121212) : Colors.white;
 
@@ -131,7 +181,8 @@ if (user != null) {
 
                   // ── ЛОГОТИП ──
                   Container(
-                    width: 88, height: 88,
+                    width: 88,
+                    height: 88,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFFD97706), Color(0xFFEF4444)],
@@ -139,11 +190,13 @@ if (user != null) {
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: [BoxShadow(
-                        color: const Color(0xFFD97706).withValues(alpha: 0.35),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      )],
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        )
+                      ],
                     ),
                     child: const Icon(Icons.storefront_rounded,
                         color: Colors.white, size: 44),
@@ -183,6 +236,18 @@ if (user != null) {
 
                   const SizedBox(height: 16),
 
+                  // ✅ Загрузка учурунда жардам текст
+                  if (_isLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Браузерде Google аккаунтуңузду тандаңыз...',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.grey400),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
                   Text(
                     loc.get('sign_in_terms'),
                     style: AppTextStyles.bodySmall
@@ -201,6 +266,7 @@ if (user != null) {
   }
 
   Widget _buildGoogleButton(AppLocalizations loc, bool isDark) {
+    // Windows үчүн Seller Login баскычы
     if (defaultTargetPlatform == TargetPlatform.windows) {
       return GestureDetector(
         onTap: () => Navigator.push(context,
@@ -212,11 +278,13 @@ if (user != null) {
           decoration: BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            )],
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -225,15 +293,15 @@ if (user != null) {
                   color: Colors.white, size: 22),
               const SizedBox(width: 12),
               Text(loc.get('seller_login'),
-                  style: AppTextStyles.headingSmall
-                      .copyWith(color: Colors.white)),
+                  style:
+                      AppTextStyles.headingSmall.copyWith(color: Colors.white)),
             ],
           ),
         ),
       );
     }
 
-    final btnColor  = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+    final btnColor = isDark ? const Color(0xFF2C2C2C) : Colors.white;
     final btnBorder = isDark ? const Color(0xFF3A3A3A) : AppColors.grey200;
     final textColor = isDark ? Colors.white : AppColors.black;
 
@@ -244,25 +312,40 @@ if (user != null) {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: btnColor,
+          color: _isLoading
+              ? (isDark ? const Color(0xFF222222) : AppColors.grey100)
+              : btnColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: btnBorder, width: 1.5),
-          boxShadow: [BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )],
+          boxShadow: _isLoading
+              ? []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  )
+                ],
         ),
         child: _isLoading
-            ? const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                    strokeWidth: 2.5,
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2.5,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Кирүү жүрүп жатат...',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.grey500),
+                  ),
+                ],
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -279,6 +362,9 @@ if (user != null) {
   }
 }
 
+// ══════════════════════════════════════════════════════
+// Google логотипи
+// ══════════════════════════════════════════════════════
 class _GoogleLogo extends StatelessWidget {
   const _GoogleLogo();
 
@@ -316,8 +402,8 @@ class _GoogleGPainter extends CustomPainter {
     }
 
     drawArc(-90, 90, const Color(0xFF4285F4));
-    drawArc(0,   90, const Color(0xFF34A853));
-    drawArc(90,  90, const Color(0xFFFBBC05));
+    drawArc(0, 90, const Color(0xFF34A853));
+    drawArc(90, 90, const Color(0xFFFBBC05));
     drawArc(180, 90, const Color(0xFFEA4335));
   }
 
