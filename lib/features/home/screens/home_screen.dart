@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:dd_online/core/update_checker.dart' as UpdateChecker;
+import 'package:dd_online/core/update_checker_stub.dart' as UpdateChecker;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../config/theme/app_colors.dart';

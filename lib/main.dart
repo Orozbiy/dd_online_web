@@ -20,7 +20,7 @@ import 'firebase_options.dart';
 import 'services/notification_service.dart';
 
 // ✅ prefix оңдолду: update_checker (underscore эмес)
-import 'core/update_checker.dart'
+import 'core/update_checker_stub.dart'
     if (dart.library.html) 'core/update_checker_stub.dart' as update_checker;
 
 // ──────────────────────────────────────────────────────
@@ -113,14 +113,14 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
       isDark:   _themeProvider.isDark,
       child: LocaleScope(
         provider: _localeProvider,
-        locale:   _localeProvider.locale,
+        locale: _localeProvider.locale,
         child: MaterialApp(
           title:                      'DD Online',
           debugShowCheckedModeBanner:  false,
           theme:                       AppTheme.lightTheme,
           darkTheme:                   AppTheme.darkTheme,
           themeMode:                   _themeProvider.themeMode,
-          navigatorKey:                navigatorKey,
+          navigatorKey: navigatorKey,
           locale:                      _localeProvider.locale,
           supportedLocales: const     [Locale('ky'), Locale('ru')],
           localizationsDelegates: const [

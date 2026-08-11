@@ -45,8 +45,8 @@ class PriceWatchService {
       final body  = '${newPrice.toStringAsFixed(0)} сом (${oldPrice.toStringAsFixed(0)} сомдон), $saved сомго арзандады!';
 
       for (final row in tokenRows) {
-        final token = row['token'] as String?;
-        if (token == null || token.isEmpty) continue;
+       final token = row['token'] as String?;
+if (token == null) continue;
         await _sendFcm(token: token, title: title, body: body, productId: productId, accessToken: accessToken);
       }
 

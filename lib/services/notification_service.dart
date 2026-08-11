@@ -10,10 +10,6 @@ import '../features/chat/screens/chat_screen.dart';
 import '../features/product_detail/screens/product_detail_screen.dart';
 import '../data/models/product_model.dart';
 
-// ── Мобайл гана: flutter_local_notifications ──
-import 'notification_service_mobile.dart'
-    if (dart.library.html) 'notification_service_stub.dart' as platform;
-
 // ─────────────────────────────────────────────────────────────
 // GLOBAL NAVIGATOR KEY — MaterialApp'ка берилет
 // ─────────────────────────────────────────────────────────────
@@ -27,7 +23,6 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  // ✅ Static fields — main.dart'тан жетүү үчүн
   static String? pendingChatId;
   static String? pendingProductId;
 
@@ -44,11 +39,6 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-
-    // ✅ Мобайл гана: local notifications
-    if (!kIsWeb) {
-      await platform.initLocalNotifications();
-    }
 
     // ── Foreground message ──
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -72,17 +62,8 @@ class NotificationService {
         payload = 'chat:$chatId';
       }
 
-      if (kIsWeb) {
-        _showWebSnackbar(title, body, payload);
-      } else {
-        platform.showLocalNotification(
-          id:      message.messageId.hashCode,
-          title:   title,
-          body:    body,
-          payload: payload,
-          onTap:   _handlePayload,
-        );
-      }
+      // ✅ Веб — дайыма SnackBar
+      _showWebSnackbar(title, body, payload);
     });
 
     // ── Background → Foreground tap ──
@@ -102,39 +83,14 @@ class NotificationService {
       }
     });
 
-    if (!kIsWeb) {
-      await _messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    }
-
     debugPrint('✅ NotificationService даяр');
   }
 
   // ─────────────────────────────────────────────────────────────
-  // TERMINATED STATE — мобайл гана
+  // TERMINATED STATE — веб'де колдонулбайт, бош калтырылат
   // ─────────────────────────────────────────────────────────────
   Future<void> handleInitialMessage() async {
-    try {
-      final message = await _messaging.getInitialMessage();
-      if (message == null) return;
-
-      final chatId    = message.data['chatId']    as String?;
-      final productId = message.data['productId'] as String?;
-      final type      = message.data['type']      as String? ?? 'chat_message';
-
-      if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
-        NotificationService.pendingChatId = chatId;
-      } else if (type == 'price_drop' && productId != null && productId.isNotEmpty) {
-        NotificationService.pendingProductId = productId;
-      } else if (chatId != null && chatId.isNotEmpty) {
-        NotificationService.pendingChatId = chatId;
-      }
-    } catch (e) {
-      debugPrint('❌ handleInitialMessage ката: $e');
-    }
+    // Веб'де terminated state жок
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -359,27 +315,6 @@ class NotificationService {
           'message': {
             'token': fcmToken,
             'notification': {'title': senderName, 'body': messageText},
-            'android': {
-              'priority': 'high',
-              'notification': {
-                'channel_id':              'chat_messages',
-                'sound':                   'default',
-                'default_vibrate_timings':  true,
-                'notification_priority':   'PRIORITY_MAX',
-                'visibility':              'PUBLIC',
-                'click_action':            'FLUTTER_NOTIFICATION_CLICK',
-              },
-            },
-            'apns': {
-              'payload': {
-                'aps': {
-                  'sound':            'default',
-                  'badge':             1,
-                  'content-available': 1,
-                },
-              },
-              'headers': {'apns-priority': '10'},
-            },
             'webpush': {
               'notification': {
                 'title': senderName,
@@ -445,21 +380,6 @@ class NotificationService {
               'message': {
                 'token': token,
                 'notification': {'title': title, 'body': body},
-                'android': {
-                  'priority': 'high',
-                  'notification': {
-                    'channel_id':              'chat_messages',
-                    'sound':                   'default',
-                    'notification_priority':   'PRIORITY_MAX',
-                    'default_vibrate_timings':  true,
-                  },
-                },
-                'apns': {
-                  'payload': {
-                    'aps': {'sound': 'default', 'badge': 1},
-                  },
-                  'headers': {'apns-priority': '10'},
-                },
                 'webpush': {
                   'notification': {
                     'title': title,
@@ -491,17 +411,7 @@ class NotificationService {
   // TEST NOTIFICATION
   // ─────────────────────────────────────────────────────────────
   Future<void> showTestNotification() async {
-    if (kIsWeb) {
-      _showWebSnackbar('DD Online 🛍️', 'Уведомления иштеп жатат!', '');
-    } else {
-      await platform.showLocalNotification(
-        id:      999,
-        title:   'DD Online 🛍️',
-        body:    'Уведомления иштеп жатат!',
-        payload: '',
-        onTap:   _handlePayload,
-      );
-    }
+    _showWebSnackbar('DD Online 🛍️', 'Уведомления иштеп жатат!', '');
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -513,9 +423,7 @@ class NotificationService {
       if (user == null) return;
 
       final token = await _messaging.getToken(
-        vapidKey: kIsWeb
-            ? 'YOUR_VAPID_KEY' // ← Firebase Console → Web Push certificates
-            : null,
+        vapidKey: 'YOUR_VAPID_KEY', // ← Firebase Console → Web Push certificates
       );
       if (token == null) return;
 

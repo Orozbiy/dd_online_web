@@ -13,6 +13,7 @@ import 'seller_dashboard_screen.dart';
 import 'seller_pending_screen.dart';
 import 'seller_register_screen.dart';
 import '../../home/screens/home_screen.dart';
+import 'dart:async' show unawaited;
 
 // ✅ АЛЫНДЫ: өзүнүн unawaited жок — main.dart'тагысы колдонулат
 
