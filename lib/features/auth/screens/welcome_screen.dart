@@ -108,19 +108,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     _loadingTimeoutTimer?.cancel();
-    _loadingTimeoutTimer = Timer(const Duration(seconds: 60), () {
-      if (mounted && _isLoading) {
-        setState(() => _isLoading = false);
-        _showSnack(
-          AppLocalizations.of(context).get('login_error') +
-              ': Убакыт бүттү. Кайра аракет кылыңыз.',
-          isError: true,
-        );
-      }
-    });
+
+    // Веб жагында redirect болот — 60 сек таймер мобил үчүн гана актуал
+    if (!kIsWeb) {
+      _loadingTimeoutTimer = Timer(const Duration(seconds: 60), () {
+        if (mounted && _isLoading) {
+          setState(() => _isLoading = false);
+          _showSnack(
+            AppLocalizations.of(context).get('login_error') +
+                ': Убакыт бүттү. Кайра аракет кылыңыз.',
+            isError: true,
+          );
+        }
+      });
+    }
 
     try {
       await AuthService.instance.signInWithGoogle();
+      // Веб жагында бул жерге жетпейт (redirect болот)
+      // Мобилде: _authSub listener HomeScreen'га өзү багыттайт
     } catch (e) {
       _loadingTimeoutTimer?.cancel();
       if (mounted) {
@@ -220,11 +226,24 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                   const SizedBox(height: 16),
 
-                  if (_isLoading)
+                  // Мобилде loading маалымат текст
+                  if (_isLoading && !kIsWeb)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        'Браузерде Google аккаунтуңузду тандаңыз...',
+                        'Google аккаунтуңузду тандаңыз...',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.grey400),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+                  // Веб жагында loading маалымат текст
+                  if (_isLoading && kIsWeb)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Google барагы ачылды, аккаунтту тандаңыз...',
                         style: AppTextStyles.bodySmall
                             .copyWith(color: AppColors.grey400),
                         textAlign: TextAlign.center,
@@ -255,7 +274,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // ── Google баскычы ──
   Widget _buildGoogleButton(AppLocalizations loc, bool isDark) {
-    if (defaultTargetPlatform == TargetPlatform.windows) {
+    // ✅ ОҢДОО: kIsWeb колдон, defaultTargetPlatform эмес
+    // Windows desktop колдонмосунда (веб эмес) — Seller Login гана
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
       return GestureDetector(
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const SellerLoginScreen())),
@@ -287,6 +308,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       );
     }
 
+    // ✅ Веб + Мобил (Android / iOS) — Google баскычы
     final btnColor = isDark ? const Color(0xFF2C2C2C) : Colors.white;
     final btnBorder = isDark ? const Color(0xFF3A3A3A) : AppColors.grey200;
     final textColor = isDark ? Colors.white : AppColors.black;
@@ -327,7 +349,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Кирүү жүрүп жатат...',
+                    kIsWeb ? 'Багытталууда...' : 'Кирүү жүрүп жатат...',
                     style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500),
                   ),
                 ],
