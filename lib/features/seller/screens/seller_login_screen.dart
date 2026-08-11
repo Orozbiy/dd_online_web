@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/seller_auth_service.dart';
 import '../../../core/supabase_client.dart';
-// ✅ КОШУЛДУ: NotificationService import
 import '../../../services/notification_service.dart';
 
 import '../models/seller_model.dart';
@@ -13,9 +13,6 @@ import 'seller_dashboard_screen.dart';
 import 'seller_pending_screen.dart';
 import 'seller_register_screen.dart';
 import '../../home/screens/home_screen.dart';
-import 'dart:async' show unawaited;
-
-// ✅ АЛЫНДЫ: өзүнүн unawaited жок — main.dart'тагысы колдонулат
 
 class SellerLoginScreen extends StatefulWidget {
   const SellerLoginScreen({super.key});
@@ -55,32 +52,45 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
       return;
     }
 
-    final seller = await _sellerService.getSellerByUid(user.id);
-    if (!mounted) return;
+    try {
+      final seller = await _sellerService
+          .getSellerByUid(user.id)
+          .timeout(const Duration(seconds: 8));
 
-    if (seller == null) {
-      await supabase.auth.signOut();
-      setState(() => _checkingSession = false);
-      return;
-    }
+      if (!mounted) return;
 
-    if (seller.status == SellerStatus.pending) {
-      Navigator.pushAndRemoveUntil(context,
+      if (seller == null) {
+        await supabase.auth.signOut();
+        if (mounted) setState(() => _checkingSession = false);
+        return;
+      }
+
+      if (seller.status == SellerStatus.pending) {
+        Navigator.pushAndRemoveUntil(
+          context,
           MaterialPageRoute(builder: (_) => const SellerPendingScreen()),
-          (route) => false);
-    } else if (seller.status == SellerStatus.rejected) {
-      Navigator.pushAndRemoveUntil(context,
+          (route) => false,
+        );
+      } else if (seller.status == SellerStatus.rejected) {
+        Navigator.pushAndRemoveUntil(
+          context,
           MaterialPageRoute(builder: (_) => const SellerRejectedScreen()),
-          (route) => false);
-    } else if (seller.status == SellerStatus.blocked) {
-      await supabase.auth.signOut();
-      setState(() => _checkingSession = false);
-    } else {
-      // ✅ ОҢДОЛДУ: comment алынды, NotificationService иштейт
-      unawaited(NotificationService().saveMyToken());
-      Navigator.pushAndRemoveUntil(context,
+          (route) => false,
+        );
+      } else if (seller.status == SellerStatus.blocked) {
+        await supabase.auth.signOut();
+        if (mounted) setState(() => _checkingSession = false);
+      } else {
+        unawaited(NotificationService().saveMyToken());
+        Navigator.pushAndRemoveUntil(
+          context,
           MaterialPageRoute(builder: (_) => SellerDashboardScreen(uid: seller.uid)),
-          (route) => false);
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Timeout же network ката болсо — login формасын көрсөт
+      if (mounted) setState(() => _checkingSession = false);
     }
   }
 
@@ -136,7 +146,6 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
         await supabase.auth.signOut();
         _showSnack(loc.get('login_blocked'));
       } else {
-        // ✅ ОҢДОЛДУ: comment алынды, NotificationService иштейт
         unawaited(NotificationService().saveMyToken());
         Navigator.pushAndRemoveUntil(
           context,
@@ -176,7 +185,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
       return Scaffold(
         backgroundColor: bgColor,
         body: const Center(
-            child: CircularProgressIndicator(color: AppColors.primary)),
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
@@ -190,15 +200,19 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-              Navigator.pushAndRemoveUntil(context,
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  (route) => false);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                (route) => false,
+              );
             }
           },
           child: Icon(Icons.arrow_back, color: arrowColor),
         ),
-        title: Text(loc.get('login_title'),
-            style: AppTextStyles.headingMedium.copyWith(color: titleColor)),
+        title: Text(
+          loc.get('login_title'),
+          style: AppTextStyles.headingMedium.copyWith(color: titleColor),
+        ),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -209,16 +223,22 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
             children: [
               const SizedBox(height: 24),
 
-              Text(loc.get('login_heading'),
-                  style: AppTextStyles.headingLarge.copyWith(color: headColor)),
+              Text(
+                loc.get('login_heading'),
+                style: AppTextStyles.headingLarge.copyWith(color: headColor),
+              ),
               const SizedBox(height: 8),
-              Text(loc.get('login_subheading'),
-                  style: AppTextStyles.bodyMedium.copyWith(color: subColor)),
+              Text(
+                loc.get('login_subheading'),
+                style: AppTextStyles.bodyMedium.copyWith(color: subColor),
+              ),
               const SizedBox(height: 32),
 
               // ── ТЕЛЕФОН ──
-              Text(loc.get('reg_label_phone'),
-                  style: AppTextStyles.labelLarge.copyWith(color: labelColor)),
+              Text(
+                loc.get('reg_label_phone'),
+                style: AppTextStyles.labelLarge.copyWith(color: labelColor),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneCtrl,
@@ -232,9 +252,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                   ),
                   hintText: '700123456',
                   hintStyle: TextStyle(
-                      color: isDark
-                          ? const Color(0xFF666666)
-                          : AppColors.grey400),
+                    color: isDark ? const Color(0xFF666666) : AppColors.grey400,
+                  ),
                   filled: true,
                   fillColor: fieldFill,
                   contentPadding:
@@ -245,16 +264,18 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 1.5),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
               // ── ПАРОЛЬ ──
-              Text(loc.get('reg_label_pass'),
-                  style: AppTextStyles.labelLarge.copyWith(color: labelColor)),
+              Text(
+                loc.get('reg_label_pass'),
+                style: AppTextStyles.labelLarge.copyWith(color: labelColor),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordCtrl,
@@ -264,9 +285,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                 decoration: InputDecoration(
                   hintText: '••••••••',
                   hintStyle: TextStyle(
-                      color: isDark
-                          ? const Color(0xFF666666)
-                          : AppColors.grey400),
+                    color: isDark ? const Color(0xFF666666) : AppColors.grey400,
+                  ),
                   filled: true,
                   fillColor: fieldFill,
                   contentPadding:
@@ -277,8 +297,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 1.5),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                   suffixIcon: GestureDetector(
                     onTap: () => setState(() => _obscure = !_obscure),
@@ -300,7 +320,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor: AppColors.grey200,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
                   child: _isLoading
@@ -308,11 +329,17 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5),
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
                         )
-                      : Text(loc.get('login_btn'),
+                      : Text(
+                          loc.get('login_btn'),
                           style: AppTextStyles.labelLarge.copyWith(
-                              color: Colors.white, fontSize: 16)),
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -323,7 +350,8 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
                   onPressed: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const SellerRegisterScreen()),
+                      builder: (_) => const SellerRegisterScreen(),
+                    ),
                   ),
                   child: Text(
                     loc.get('login_no_account'),

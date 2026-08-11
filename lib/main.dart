@@ -52,8 +52,20 @@ Future<void> main() async {
     await NotificationService().handleInitialMessage();
   }
 
-  await CartManager.instance.loadFromPrefs();
-  await FavoritesManager().loadFromPrefs();
+  // ✅ ВЕБ'де timeout менен — бекип калбасын
+  if (kIsWeb) {
+    try {
+      await CartManager.instance.loadFromPrefs()
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {}
+    try {
+      await FavoritesManager().loadFromPrefs()
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {}
+  } else {
+    await CartManager.instance.loadFromPrefs();
+    await FavoritesManager().loadFromPrefs();
+  }
 
   unawaited(NotificationService().saveMyToken());
 
@@ -212,10 +224,26 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 
   Future<void> _determineScreen() async {
-    final prefs    = await SharedPreferences.getInstance();
-    final langCode = prefs.getString('app_locale') ?? 'ky';
+    // ✅ ОҢДОО: SharedPreferences веб'де бекип калышы мүмкүн — timeout кош
+    String langCode = 'ky';
+    try {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 5));
+      langCode = prefs.getString('app_locale') ?? 'ky';
+    } catch (e) {
+      debugPrint('⚠️ SharedPreferences timeout: $e');
+      // Демейки тилди колдон, улантабыз
+    }
 
-    _targetScreen = await _getTargetScreen();
+    // ✅ ОҢДОО: _getTargetScreen да timeout — бекип калбасын
+    try {
+      _targetScreen = await _getTargetScreen()
+          .timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('⚠️ _getTargetScreen timeout: $e');
+      _targetScreen = const WelcomeScreen(); // Ката болсо Welcome экран
+    }
+
     if (mounted) setState(() => _checking = false);
 
     // ── Pending chat ──

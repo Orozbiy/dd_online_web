@@ -20,6 +20,7 @@ class AuthService {
         await supabase.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: 'https://dd-online-web.web.app',
+          authScreenLaunchMode: LaunchMode.externalApplication, 
         );
         // Бул жерге эч качан жетпейт — браузер redirect болот
       } else {
