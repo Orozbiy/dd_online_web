@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,8 @@ import 'package:flutter/foundation.dart';
 import 'core/locale_provider.dart';
 import 'core/app_localizations.dart';
 import 'core/theme_provider.dart';
+import 'core/update_checker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -26,6 +29,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('🚀 MAIN БАШТАЛДЫ');
 
   if (defaultTargetPlatform != TargetPlatform.windows) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -33,17 +37,23 @@ Future<void> main() async {
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  // ✅ Supabase + Firebase ПАРАЛЛЕЛДҮҮ — эки эсе тез
-  await Future.wait([
-    SupabaseInit.init(),
-    _initFirebase(),
-  ]);
+  debugPrint('🚀 Supabase init...');
+  await SupabaseInit.init();
 
-  // ✅ Cart & Favorites фондо жүктөлөт — app'ты токтотпойт
-  unawaited(CartManager.instance.loadFromPrefs());
-  unawaited(FavoritesManager().loadFromPrefs());
+  debugPrint('🚀 Firebase init...');
+  await _initFirebase();
+
+  debugPrint('🚀 handleInitialMessage...');
+  await NotificationService().handleInitialMessage();
+
+  debugPrint('🚀 Cart & Favorites...');
+  await CartManager.instance.loadFromPrefs();
+  await FavoritesManager().loadFromPrefs();
+
+  debugPrint('🚀 saveMyToken...');
   unawaited(NotificationService().saveMyToken());
 
+  debugPrint('🚀 runApp...');
   runApp(const ActiveStatusTracker(child: DDOnlineApp()));
 }
 
@@ -66,6 +76,9 @@ void unawaited(Future<void> future) {
   future.catchError((e) => debugPrint('⚠️ Untracked error: $e'));
 }
 
+// ══════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════
 class DDOnlineApp extends StatefulWidget {
   const DDOnlineApp({super.key});
 
@@ -75,14 +88,13 @@ class DDOnlineApp extends StatefulWidget {
 
 class _DDOnlineAppState extends State<DDOnlineApp> {
   final _localeProvider = LocaleProvider();
-  final _themeProvider = ThemeProvider();
+  final _themeProvider  = ThemeProvider();
 
   @override
   void initState() {
     super.initState();
     _localeProvider.loadSavedLocale();
     _localeProvider.addListener(() => setState(() {}));
-
     _themeProvider.loadSavedTheme();
     _themeProvider.addListener(() => setState(() {}));
   }
@@ -100,19 +112,19 @@ class _DDOnlineAppState extends State<DDOnlineApp> {
   Widget build(BuildContext context) {
     return ThemeScope(
       provider: _themeProvider,
-      isDark: _themeProvider.isDark,
+      isDark:   _themeProvider.isDark,
       child: LocaleScope(
         provider: _localeProvider,
-        locale: _localeProvider.locale,
+        locale:   _localeProvider.locale,
         child: MaterialApp(
-          title: 'DD Online',
+          title:                     'DD Online',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: _themeProvider.themeMode,
-          navigatorKey: navigatorKey,
-          locale: _localeProvider.locale,
-          supportedLocales: const [Locale('ky'), Locale('ru')],
+          theme:                     AppTheme.lightTheme,
+          darkTheme:                 AppTheme.darkTheme,
+          themeMode:                 _themeProvider.themeMode,
+          navigatorKey:              navigatorKey,
+          locale:                    _localeProvider.locale,
+          supportedLocales: const   [Locale('ky'), Locale('ru')],
           localizationsDelegates: const [
             AppLocalizationsDelegate(),
             GlobalMaterialLocalizations.delegate,
@@ -179,41 +191,89 @@ class SplashRouter extends StatefulWidget {
 }
 
 class _SplashRouterState extends State<SplashRouter> {
-  bool _checking = true;
+  bool    _checking     = true;
   Widget? _targetScreen;
+
+  final _appLinks = AppLinks();
 
   @override
   void initState() {
     super.initState();
     _determineScreen();
+    _listenDeepLinks();
   }
 
-  Future<void> _determineScreen() async {
-    _targetScreen = await _getTargetScreen();
-    if (mounted) setState(() => _checking = false);
+  void _listenDeepLinks() {
+    _appLinks.uriLinkStream.listen((uri) {
+      debugPrint('🔗 Deep link келди: $uri');
+      _handleDeepLink(uri);
+    });
+  }
 
-    final pendingChat = NotificationService.pendingChatId;
-    if (pendingChat != null) {
-      NotificationService.pendingChatId = null;
+  void _handleDeepLink(Uri uri) {
+    if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'product') {
+      final productId = uri.pathSegments[1];
+      debugPrint('🔗 Product deep link: $productId');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        NotificationService().navigateToChatPublic(pendingChat);
+        NotificationService().navigateToProductPublic(productId);
       });
     }
   }
 
-  Future<Widget> _getTargetScreen() async {
-    // ✅ currentUser — network call жок, кэштен алат, заматта иштейт
-    final user = supabase.auth.currentUser;
-    if (user != null) return const HomeScreen();
-    return const WelcomeScreen();
+  Future<void> _determineScreen() async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        debugPrint('🔗 Initial deep link: $initialUri');
+        if (initialUri.pathSegments.length >= 2 &&
+            initialUri.pathSegments[0] == 'product') {
+          NotificationService.pendingProductId = initialUri.pathSegments[1];
+        }
+      }
+    } catch (_) {}
+
+    // ✅ prefs'ти МУРДА окуйбуз
+    final prefs = await SharedPreferences.getInstance();
+    final langCode = prefs.getString('app_locale') ?? 'ky';
+
+    _targetScreen = await _getTargetScreen();
+    if (mounted) setState(() => _checking = false);
+
+    // ── Pending chat ──
+    final pendingChat = NotificationService.pendingChatId;
+    if (pendingChat != null) {
+      NotificationService.pendingChatId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future.delayed(const Duration(milliseconds: 600));
+        NotificationService().navigateToChatPublic(pendingChat);
+      });
+    }
+
+    // ✅ версия текшерүү
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 300));
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      await UpdateChecker.check(ctx, langCode);
+    });
   }
+Future<Widget> _getTargetScreen() async {
+  final user = supabase.auth.currentSession?.user;
+  if (user != null) {
+    // ✅ Колдонуучу кирип турса — токенди дайыма жаңырт
+    // (колдонмо өчүп-күйгөндө, токен эскирип же жок болуп калышы мүмкүн)
+    unawaited(NotificationService().saveMyToken());
+    return const HomeScreen();
+  }
+  return const WelcomeScreen();
+}
 
   @override
   Widget build(BuildContext context) {
     if (_checking) return const _SplashScreen();
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeOut,
+      duration:          const Duration(milliseconds: 300),
+      switchInCurve:     Curves.easeOut,
       transitionBuilder: (child, animation) =>
           FadeTransition(opacity: animation, child: child),
       child: _targetScreen!,
@@ -234,16 +294,15 @@ class _SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<_SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _scaleAnim;
-  late Animation<double> _fadeAnim;
+  late Animation<double>   _scaleAnim;
+  late Animation<double>   _fadeAnim;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this,
-      // ✅ 600ms → 300ms: анимация эки эсе тез
-      duration: const Duration(milliseconds: 300),
+      vsync:    this,
+      duration: const Duration(milliseconds: 600),
     );
     _scaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
@@ -274,30 +333,30 @@ class _SplashScreenState extends State<_SplashScreen>
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 96,
+                      width:  96,
                       height: 96,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFD97706), Color(0xFFEF4444)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                          begin:  Alignment.topLeft,
+                          end:    Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(28),
                       ),
                       child: const Icon(
                         Icons.storefront_rounded,
                         color: Colors.white,
-                        size: 46,
+                        size:  46,
                       ),
                     ),
                     Positioned(
                       bottom: -10,
-                      right: -10,
+                      right:  -10,
                       child: Container(
-                        width: 34,
+                        width:  34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
+                          color:        const Color(0xFF1A1A1A),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: const Color(0xFFD97706),
@@ -307,7 +366,7 @@ class _SplashScreenState extends State<_SplashScreen>
                         child: const Icon(
                           Icons.navigation_rounded,
                           color: Color(0xFFD97706),
-                          size: 16,
+                          size:  18,
                         ),
                       ),
                     ),
@@ -317,83 +376,25 @@ class _SplashScreenState extends State<_SplashScreen>
                 const Text(
                   'DD Online',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w500,
+                    color:         Colors.white,
+                    fontSize:      28,
+                    fontWeight:    FontWeight.w800,
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 const Text(
                   'Дордой базары',
                   style: TextStyle(
-                    color: Color(0xFFD97706),
-                    fontSize: 13,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.w400,
+                    color:    Color(0xFF888888),
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 40),
-                const _DotsIndicator(),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _DotsIndicator extends StatefulWidget {
-  const _DotsIndicator();
-
-  @override
-  State<_DotsIndicator> createState() => _DotsIndicatorState();
-}
-
-class _DotsIndicatorState extends State<_DotsIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final delay = i * 0.3;
-            final value = ((_ctrl.value - delay) % 1.0).clamp(0.0, 1.0);
-            final opacity =
-                (value < 0.5 ? value * 2 : (1.0 - value) * 2).clamp(0.3, 1.0);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD97706).withValues(alpha: opacity),
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 }

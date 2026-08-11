@@ -8,6 +8,9 @@ import '../../seller/services/subscription_service.dart';
 import '../../map/screens/admin_map_picker_screen.dart';
 import 'admin_stats_screen.dart';
 import 'admin_story_manager_screen.dart';
+import 'admin_seller_stats_screen.dart';
+import 'admin_phone_requests_screen.dart';
+import '../widgets/admin_notification_sender.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -15,6 +18,7 @@ class AdminPanelScreen extends StatefulWidget {
   @override
   State<AdminPanelScreen> createState() => _AdminPanelScreenState();
 }
+
 
 class _AdminPanelScreenState extends State<AdminPanelScreen>
     with SingleTickerProviderStateMixin {
@@ -25,21 +29,21 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   List<SellerModel> _pendingSellers = [];
   List<SellerModel> _approvedSellers = [];
   List<SellerModel> _allSellers = [];
+  List<Map<String, dynamic>> _phoneRequests = []; 
   bool _isLoading = true;
 
-  // ── Издөө ──
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  // ── Админдин өз картасы ──
   String? _adminCardMasked;
   // ignore: unused_field
   String? _adminCardToken;
+  
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _loadData();
     _loadAdminCard();
     _searchCtrl.addListener(() {
@@ -54,7 +58,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     super.dispose();
   }
 
-  // ── Издөө фильтри ──
   List<SellerModel> get _filteredApproved {
     if (_searchQuery.isEmpty) return _approvedSellers;
     return _approvedSellers
@@ -69,22 +72,26 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   // ══════════════════════════════════════════════════════
   // МААЛЫМАТ ЖҮКТӨӨ
   // ══════════════════════════════════════════════════════
+Future<void> _loadData() async {
+  setState(() => _isLoading = true);
+  final all = await _service.getAllSellers();
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final all = await _service.getAllSellers();
-    setState(() {
-      _allSellers = all;
-      _pendingSellers =
-          all.where((s) => s.status == SellerStatus.pending).toList();
-      _approvedSellers = all
-          .where((s) =>
-              s.status == SellerStatus.approved ||
-              s.status == SellerStatus.blocked)
-          .toList();
-      _isLoading = false;
-    });
-  }
+  // ── Номер өзгөртүү өтүнүчтөрү ──
+  final phoneReqs = await supabase
+      .from('phone_change_requests')
+      .select()
+      .order('created_at', ascending: false);
+
+  setState(() {
+    _allSellers      = all;
+    _pendingSellers  = all.where((s) => s.status == SellerStatus.pending).toList();
+    _approvedSellers = all.where((s) =>
+        s.status == SellerStatus.approved ||
+        s.status == SellerStatus.blocked).toList();
+    _phoneRequests   = (phoneReqs as List).cast<Map<String, dynamic>>();
+    _isLoading       = false;
+  });
+}
 
   Future<void> _loadAdminCard() async {
     try {
@@ -158,16 +165,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           '${seller.shopName} дүкөнүнүн авто төлөмүн токтотосузбу?');
       if (confirm != true) return;
       await _subService.cancelAutoPayment(seller.uid);
-      _showSnack(
-          '⛔ ${seller.shopName} авто төлөмү токтотулду', AppColors.error);
+      _showSnack('⛔ ${seller.shopName} авто төлөмү токтотулду', AppColors.error);
     } else {
       if (!seller.hasCard) {
         _showSnack('❗ Сатуучунун картасы байланган эмес', AppColors.error);
         return;
       }
       await _subService.enableAutoPayment(seller.uid);
-      _showSnack(
-          '✅ ${seller.shopName} авто төлөмү иштетилди', AppColors.success);
+      _showSnack('✅ ${seller.shopName} авто төлөмү иштетилди', AppColors.success);
     }
     _loadData();
   }
@@ -186,8 +191,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title:
-            const Text('📞 Номер өзгөртүү', style: AppTextStyles.headingSmall),
+        title: const Text('📞 Номер өзгөртүү', style: AppTextStyles.headingSmall),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.phone,
@@ -196,13 +200,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Жок', style: TextStyle(color: AppColors.grey500)),
+            child: const Text('Жок', style: TextStyle(color: AppColors.grey500)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-            child: const Text('Сактоо',
-                style: TextStyle(color: AppColors.primary)),
+            child: const Text('Сактоо', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -228,13 +230,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Жок', style: TextStyle(color: AppColors.grey500)),
+            child: const Text('Жок', style: TextStyle(color: AppColors.grey500)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-            child: const Text('Сактоо',
-                style: TextStyle(color: AppColors.primary)),
+            child: const Text('Сактоо', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -254,99 +254,96 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     final result = await showDialog<String>(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('🔑 Пароль жаңылоо',
-                  style: AppTextStyles.headingSmall),
-              const SizedBox(height: 4),
-              Text(seller.shopName,
-                  style: AppTextStyles.labelSmall
-                      .copyWith(color: AppColors.grey500)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: ctrl,
-                obscureText: !showPass,
-                decoration: InputDecoration(
-                  hintText: 'Жаңы пароль',
-                  filled: true,
-                  fillColor: const Color.fromARGB(255, 58, 57, 57),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  suffixIcon: GestureDetector(
-                    onTap: () => setS(() => showPass = !showPass),
-                    child: Icon(
-                        showPass ? Icons.visibility : Icons.visibility_off,
-                        color: AppColors.grey400,
-                        size: 20),
+        builder: (context, setS) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final fieldColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF3F4F6);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('🔑 Пароль жаңылоо', style: AppTextStyles.headingSmall),
+                const SizedBox(height: 4),
+                Text(seller.shopName,
+                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: ctrl,
+                  obscureText: !showPass,
+                  decoration: InputDecoration(
+                    hintText: 'Жаңы пароль',
+                    filled: true,
+                    fillColor: fieldColor,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    suffixIcon: GestureDetector(
+                      onTap: () => setS(() => showPass = !showPass),
+                      child: Icon(
+                          showPass ? Icons.visibility : Icons.visibility_off,
+                          color: AppColors.grey400,
+                          size: 20),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: !showPass,
-                decoration: InputDecoration(
-                  hintText: 'Паролду тастыктаңыз',
-                  filled: true,
-                  fillColor: const Color.fromARGB(255, 45, 44, 44),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: !showPass,
+                  decoration: InputDecoration(
+                    hintText: 'Паролду тастыктаңыз',
+                    filled: true,
+                    fillColor: fieldColor,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                  ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Жокко чыгаруу',
+                    style: TextStyle(color: AppColors.grey500)),
+              ),
+              TextButton(
+                onPressed: () {
+                  final pass = ctrl.text;
+                  final confirm = confirmCtrl.text;
+                  final error = SellerService.validatePassword(pass);
+                  if (error != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error), backgroundColor: AppColors.error),
+                    );
+                    return;
+                  }
+                  if (pass != confirm) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Пароллдор дал келбейт!'),
+                          backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, pass);
+                },
+                child: const Text('Жаңылоо', style: TextStyle(color: AppColors.primary)),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Жокко чыгаруу',
-                  style: TextStyle(color: AppColors.grey500)),
-            ),
-            TextButton(
-              onPressed: () {
-                final pass = ctrl.text;
-                final confirm = confirmCtrl.text;
-                final error = SellerService.validatePassword(pass);
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(error), backgroundColor: AppColors.error),
-                  );
-                  return;
-                }
-                if (pass != confirm) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Пароллдор дал келбейт!'),
-                        backgroundColor: Colors.red),
-                  );
-                  return;
-                }
-                Navigator.pop(context, pass);
-              },
-              child: const Text('Жаңылоо',
-                  style: TextStyle(color: AppColors.primary)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
     if (result != null && result.isNotEmpty) {
-      final success =
-          await _service.resetPassword(uid: seller.uid, newPassword: result);
+      final success = await _service.resetPassword(uid: seller.uid, newPassword: result);
       if (success) {
-        _showSnack(
-            '🔑 ${seller.shopName} паролу жаңыланды!', AppColors.success);
+        _showSnack('🔑 ${seller.shopName} паролу жаңыланды!', AppColors.success);
       } else {
         _showSnack('Ката чыкты, кайра аракет кылыңыз', AppColors.error);
       }
@@ -354,8 +351,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   Future<void> _showSellerProducts(SellerModel s) async {
-    final stores =
-        await supabase.from('stores').select('id').eq('owner_id', s.uid);
+    final stores = await supabase.from('stores').select('id').eq('owner_id', s.uid);
     final storeIds = (stores as List).map((r) => r['id'] as String).toList();
 
     List<Map<String, dynamic>> products = [];
@@ -377,16 +373,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
-          // ── Издөө ──
           String searchQuery = '';
-          // ── Select режими ──
           bool isSelectionMode = false;
           final Set<String> selectedIds = {};
-
           List<Map<String, dynamic>> filtered = products;
 
           return StatefulBuilder(
             builder: (ctx, setS) {
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
+              final sheetBg   = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+              final fieldFill = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
+              final textColor = isDark ? Colors.white : AppColors.black;
+
               filtered = searchQuery.isEmpty
                   ? products
                   : products
@@ -399,10 +397,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                 final confirm = await showDialog<bool>(
                   context: ctx,
                   builder: (dctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                    title: const Text('Товарларды өчүрүү',
-                        style: AppTextStyles.headingSmall),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Товарларды өчүрүү', style: AppTextStyles.headingSmall),
                     content: Text(
                         '${selectedIds.length} товар толугу менен өчүрүлөт. Улантасызбы?',
                         style: AppTextStyles.bodyMedium),
@@ -434,13 +430,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
 
               return Container(
                 height: MediaQuery.of(context).size.height * 0.75,
-                decoration: const BoxDecoration(
-                  color: Color.fromARGB(255, 66, 63, 63),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                decoration: BoxDecoration(
+                  color: sheetBg,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 child: Column(
                   children: [
-                    // ── Башы ──
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                       child: Row(
@@ -452,7 +447,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(s.shopName,
-                                    style: AppTextStyles.headingSmall),
+                                    style: AppTextStyles.headingSmall
+                                        .copyWith(color: textColor)),
                                 Text('Жалпы товар: $count шт',
                                     style: AppTextStyles.labelMedium
                                         .copyWith(color: AppColors.primary)),
@@ -461,8 +457,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                           ),
                           if (isSelectionMode)
                             IconButton(
-                              icon: const Icon(Icons.close,
-                                  color: AppColors.grey500),
+                              icon: const Icon(Icons.close, color: AppColors.grey500),
                               onPressed: () => setS(() {
                                 isSelectionMode = false;
                                 selectedIds.clear();
@@ -471,27 +466,24 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                           else
                             GestureDetector(
                               onTap: () => Navigator.pop(ctx),
-                              child:
-                                  const Icon(Icons.close, color: Colors.grey),
+                              child: Icon(Icons.close,
+                                  color: isDark ? AppColors.grey400 : AppColors.grey600),
                             ),
                         ],
                       ),
                     ),
-
-                    // ── Издөө ──
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: TextField(
                         onChanged: (v) => setS(() => searchQuery = v),
-                        style: AppTextStyles.bodyMedium,
+                        style: AppTextStyles.bodyMedium.copyWith(color: textColor),
                         decoration: InputDecoration(
                           hintText: 'Товар издөө...',
                           hintStyle: AppTextStyles.bodyMedium
                               .copyWith(color: AppColors.grey400),
-                          prefixIcon: const Icon(Icons.search,
-                              color: AppColors.grey400),
+                          prefixIcon: const Icon(Icons.search, color: AppColors.grey400),
                           filled: true,
-                          fillColor: const Color.fromARGB(255, 83, 109, 162),
+                          fillColor: fieldFill,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           border: OutlineInputBorder(
@@ -501,12 +493,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                         ),
                       ),
                     ),
-
-                    // ── Баарын белгилөө ──
                     if (filtered.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         child: Row(
                           children: [
                             Checkbox(
@@ -522,14 +511,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                                   } else {
                                     selectedIds
                                       ..clear()
-                                      ..addAll(filtered
-                                          .map((p) => p['id'] as String));
+                                      ..addAll(filtered.map((p) => p['id'] as String));
                                   }
                                 });
                               },
                             ),
-                            const Text('Баарын белгилөө',
-                                style: AppTextStyles.labelLarge),
+                            Text('Баарын белгилөө',
+                                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
                             const Spacer(),
                             if (isSelectionMode)
                               Text('${selectedIds.length} тандалды',
@@ -538,15 +526,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                           ],
                         ),
                       ),
-
-                    const Divider(height: 1),
-
-                    // ── Товарлар тизмеси ──
+                    Divider(height: 1, color: isDark ? const Color(0xFF2C2C2C) : AppColors.grey200),
                     Expanded(
                       child: filtered.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text('Товар жок',
-                                  style: AppTextStyles.bodyMedium))
+                                  style: AppTextStyles.bodyMedium.copyWith(color: textColor)))
                           : ListView.builder(
                               padding: const EdgeInsets.all(16),
                               itemCount: filtered.length,
@@ -579,8 +564,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: isSelected
-                                          ? AppColors.primary
-                                              .withValues(alpha: 0.08)
+                                          ? AppColors.primary.withValues(alpha: 0.08)
                                           : Colors.transparent,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
@@ -589,35 +573,31 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                                           ? Icon(
                                               isSelected
                                                   ? Icons.check_circle_rounded
-                                                  : Icons
-                                                      .radio_button_unchecked,
+                                                  : Icons.radio_button_unchecked,
                                               color: isSelected
                                                   ? AppColors.primary
-                                                  : const Color.fromARGB(
-                                                      255, 23, 61, 117),
+                                                  : AppColors.grey400,
                                             )
                                           : const Text('📦',
                                               style: TextStyle(fontSize: 24)),
                                       title: Text(d['title'] as String? ?? '',
-                                          style: AppTextStyles.labelMedium),
+                                          style: AppTextStyles.labelMedium
+                                              .copyWith(color: textColor)),
                                       subtitle: Text(
                                           '${d['price'] ?? 0} с  •  ${d['in_stock'] ?? 0} шт',
                                           style: AppTextStyles.labelSmall
-                                              .copyWith(
-                                                  color: AppColors.grey500)),
+                                              .copyWith(color: AppColors.grey500)),
                                     ),
                                   ),
                                 );
                               },
                             ),
                     ),
-
-                    // ── Өчүрүү баскычы ──
                     if (isSelectionMode && selectedIds.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                         decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 156, 49, 49),
+                          color: isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.06),
@@ -633,17 +613,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                             onPressed: deleteSelected,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.error,
-                              foregroundColor:
-                                  const Color.fromARGB(255, 61, 192, 116),
+                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14)),
                               elevation: 0,
                             ),
                             child: Text(
                               '🗑️ Тандалган товарларды өчүрүү (${selectedIds.length})',
-                              style: AppTextStyles.labelLarge.copyWith(
-                                  color:
-                                      const Color.fromARGB(255, 43, 61, 196)),
+                              style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
                             ),
                           ),
                         ),
@@ -670,157 +647,167 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color.fromARGB(255, 181, 46, 46),
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text('🏦', style: TextStyle(fontSize: 28)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Admin картасы',
-                            style: AppTextStyles.headingSmall),
-                        Text(
-                          'Сатуучулардан акча ушул картага түшөт',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.grey500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        builder: (ctx, setS) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
               ),
-              if (_adminCardMasked != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 37, 155, 86),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.credit_card,
-                          color: AppColors.success, size: 20),
-                      const SizedBox(width: 8),
-                      Text(_adminCardMasked!,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.success,
-                              fontSize: 16)),
-                      const SizedBox(width: 6),
-                      Text('байланган',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.grey500)),
+                      const Text('🏦', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Admin картасы',
+                                style: AppTextStyles.headingSmall.copyWith(
+                                    color: isDark ? Colors.white : AppColors.black)),
+                            Text(
+                              'Сатуучулардан акча ушул картага түшөт',
+                              style: AppTextStyles.bodySmall
+                                  .copyWith(color: AppColors.grey500),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              TextField(
-                controller: cardCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 19,
-                decoration: _inputDec(
-                  _adminCardMasked != null
-                      ? 'Жаңы карта (алмаштыруу)'
-                      : 'Карта номери',
-                  '0000 0000 0000 0000',
-                ),
-                onChanged: (v) {
-                  final digits = v.replaceAll(' ', '');
-                  final formatted = digits
-                      .replaceAllMapped(
-                          RegExp(r'.{1,4}'), (m) => '${m.group(0)} ')
-                      .trim();
-                  cardCtrl.value = TextEditingValue(
-                    text: formatted,
-                    selection:
-                        TextSelection.collapsed(offset: formatted.length),
-                  );
-                  setS(() {});
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: expCtrl,
-                      keyboardType: TextInputType.number,
-                      maxLength: 5,
-                      decoration: _inputDec('Мөөнөтү', 'MM/YY'),
+                  if (_adminCardMasked != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF0A2C1A)
+                            : AppColors.success.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.credit_card,
+                              color: AppColors.success, size: 20),
+                          const SizedBox(width: 8),
+                          Text(_adminCardMasked!,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.success,
+                                  fontSize: 16)),
+                          const SizedBox(width: 6),
+                          Text('байланган',
+                              style: AppTextStyles.bodySmall
+                                  .copyWith(color: AppColors.grey500)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: cardCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 19,
+                    decoration: _inputDec(
+                      _adminCardMasked != null
+                          ? 'Жаңы карта (алмаштыруу)'
+                          : 'Карта номери',
+                      '0000 0000 0000 0000',
+                    ),
+                    onChanged: (v) {
+                      final digits = v.replaceAll(' ', '');
+                      final formatted = digits
+                          .replaceAllMapped(
+                              RegExp(r'.{1,4}'), (m) => '${m.group(0)} ')
+                          .trim();
+                      cardCtrl.value = TextEditingValue(
+                        text: formatted,
+                        selection: TextSelection.collapsed(offset: formatted.length),
+                      );
+                      setS(() {});
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: expCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 5,
+                          decoration: _inputDec('Мөөнөтү', 'MM/YY'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: cvvCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 3,
+                          obscureText: true,
+                          decoration: _inputDec('CVV', '•••'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: cardCtrl.text.replaceAll(' ', '').length == 16
+                          ? () => _saveAdminCard(cardCtrl.text, ctx)
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E40AF),
+                        disabledBackgroundColor: AppColors.grey300,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        _adminCardMasked != null
+                            ? '🔄  Картаны алмаштыруу'
+                            : '✅  Картаны сактоо',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: cvvCtrl,
-                      keyboardType: TextInputType.number,
-                      maxLength: 3,
-                      obscureText: true,
-                      decoration: _inputDec('CVV', '•••'),
+                  if (_adminCardMasked != null) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => _removeAdminCard(ctx),
+                        child: const Text('Картаны өчүрүү',
+                            style: TextStyle(color: AppColors.grey500, fontSize: 13)),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: cardCtrl.text.replaceAll(' ', '').length == 16
-                      ? () => _saveAdminCard(cardCtrl.text, ctx)
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E40AF),
-                    disabledBackgroundColor:
-                        const Color.fromARGB(255, 86, 136, 236),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    _adminCardMasked != null
-                        ? '🔄  Картаны алмаштыруу'
-                        : '✅  Картаны сактоо',
-                    style: const TextStyle(
-                        color: Color.fromARGB(255, 226, 47, 47),
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              if (_adminCardMasked != null) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: TextButton(
-                    onPressed: () => _removeAdminCard(ctx),
-                    child: const Text('Картаны өчүрүү',
-                        style:
-                            TextStyle(color: AppColors.grey500, fontSize: 13)),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -865,10 +852,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     final confirm = await _showConfirmDialog(
         '"$name" товарды толугу менен өчүрөсүзбү?\nБул кайтарылгыс!');
     if (confirm == true) {
-      await supabase
-          .from('products')
-          .delete()
-          .eq('id', product['id'] as String);
+      await supabase.from('products').delete().eq('id', product['id'] as String);
       _showSnack('🗑️ "$name" өчүрүлдү', AppColors.error);
     }
   }
@@ -877,9 +861,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     final id = product['id'] as String;
     final name = product['title'] as String? ?? 'Товар';
     final isBlocked = product['is_blocked'] as bool? ?? false;
-    await supabase
-        .from('products')
-        .update({'is_blocked': !isBlocked}).eq('id', id);
+    await supabase.from('products').update({'is_blocked': !isBlocked}).eq('id', id);
     _showSnack(
       isBlocked ? '🔓 "$name" блоктон чыгарылды' : '🔒 "$name" блоктолду',
       isBlocked ? AppColors.success : AppColors.error,
@@ -901,21 +883,28 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF0F4FF);
+
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 96, 127, 189),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E40AF),
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            const Text('🛡️', style: TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Text('Admin панели',
-                style: AppTextStyles.headingMedium
-                    .copyWith(color: const Color.fromARGB(255, 196, 133, 133))),
-          ],
-        ),
+       title: Row(
+  children: [
+    const Text('🛡️', style: TextStyle(fontSize: 22)),
+    const SizedBox(width: 8),
+    Expanded(
+      child: Text(
+        'Admin панели',
+        style: AppTextStyles.headingMedium.copyWith(color: Colors.white),
+        overflow: TextOverflow.ellipsis,
+      ),
+    ),
+  ],
+),
         actions: [
           GestureDetector(
             onTap: _showAdminCardSheet,
@@ -924,20 +913,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: _adminCardMasked != null
-                    ? const Color.fromARGB(255, 192, 159, 159)
-                        .withValues(alpha: 0.2)
+                    ? Colors.white.withValues(alpha: 0.2)
                     : AppColors.error.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.credit_card,
-                      color: Color.fromARGB(255, 185, 135, 135), size: 16),
+                  const Icon(Icons.credit_card, color: Colors.white, size: 16),
                   const SizedBox(width: 4),
                   Text(
                     _adminCardMasked ?? 'Карта жок',
                     style: const TextStyle(
-                        color: Color.fromARGB(255, 102, 183, 172),
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600),
                   ),
@@ -946,76 +933,86 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             ),
           ),
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminStoryManagerScreen()),
-            ),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AdminStoryManagerScreen())),
             child: const Padding(
               padding: EdgeInsets.only(right: 4),
-              child: Icon(Icons.auto_stories_rounded,
-                  color: Color(0xFFD97706), size: 24),
+              child: Icon(Icons.auto_stories_rounded, color: Color(0xFFD97706), size: 24),
             ),
           ),
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminStatsScreen()),
-            ),
+  onTap: () => Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const AdminPhoneRequestsScreen())),
+  child: const Padding(
+    padding: EdgeInsets.only(right: 8),
+    child: Icon(Icons.phone_callback_rounded, color: Colors.white70, size: 24),
+  ),
+),
+GestureDetector(
+  onTap: () => Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const AdminStatsScreen())),
+  child: const Padding(
+    padding: EdgeInsets.only(right: 8),
+    child: Icon(Icons.bar_chart_rounded, color: Colors.white70, size: 24),
+  ),
+),
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AdminSellerStatsScreen())),
             child: const Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: Icon(Icons.bar_chart_rounded,
-                  color: Color.fromARGB(255, 44, 131, 185), size: 24),
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.people_alt_rounded, color: Color(0xFF10B981), size: 24),
             ),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: const Color.fromARGB(255, 184, 125, 125),
-          labelColor: const Color.fromARGB(255, 222, 137, 137),
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(text: '⏳ Өтүнүчтөр (${_pendingSellers.length})'),
-            Tab(text: '✅ Sellerлер (${_approvedSellers.length})'),
-            Tab(text: '👥 Баары (${_allSellers.length})'),
-            const Tab(text: '📦 Товарлар'),
-            const Tab(text: '💳 Төлөмдөр'),
-          ],
+         tabs: [
+  Tab(text: '⏳ Өтүнүчтөр (${_pendingSellers.length})'),
+  Tab(text: '✅ Sellerлер (${_approvedSellers.length})'),
+  Tab(text: '👥 Баары (${_allSellers.length})'),
+  const Tab(text: '📦 Товарлар'),
+  const Tab(text: '💳 Төлөмдөр'),
+  Tab(text: '📞 Номер (${_phoneRequests.where((r) => r['status'] == 'pending').length})'),
+  const Tab(text: '🔔 Билдирүү'),  // ← ЖАҢ
+],
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabController,
-              children: [
-                _buildPendingTab(),
-                _buildApprovedTab(),
-                _buildAllTab(),
-                _buildProductsTab(),
-                _buildPaymentsTab(),
-              ],
+             children: [
+  _buildPendingTab(),
+  _buildApprovedTab(),
+  _buildAllTab(),
+  _buildProductsTab(),
+  _buildPaymentsTab(),
+ const AdminPhoneRequestsScreen(), 
+  _buildNotificationsTab(),   // ← ЖАҢ
+ 
+],
             ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 💬 Кардарлар билдирүүлөрү
           FloatingActionButton(
             heroTag: 'suggestions',
             onPressed: _openSuggestionsPanel,
             backgroundColor: Colors.green,
-            child: const Icon(Icons.chat_bubble_outline_rounded,
-                color: Colors.white),
+            child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white),
           ),
           const SizedBox(height: 12),
-          // 🔄 Жаңылоо
           FloatingActionButton(
             heroTag: 'refresh',
             onPressed: _loadData,
             backgroundColor: const Color(0xFF1E40AF),
-            child: const Icon(Icons.refresh,
-                color: Color.fromARGB(255, 212, 108, 108)),
+            child: const Icon(Icons.refresh, color: Colors.white),
           ),
         ],
       ),
@@ -1027,10 +1024,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   // ⏳ ӨТҮНҮЧТӨР TAB
   // ══════════════════════════════════════════════════════
 
+Widget _buildNotificationsTab() {
+  return const SingleChildScrollView(
+    padding: EdgeInsets.only(top: 12, bottom: 32),
+    child: AdminNotificationSender(),
+  );
+}
+
+
   Widget _buildPendingTab() {
-    if (_pendingSellers.isEmpty) {
-      return _buildEmpty('⏳', 'Күтүүдөгү өтүнүч жок');
-    }
+    if (_pendingSellers.isEmpty) return _buildEmpty('⏳', 'Күтүүдөгү өтүнүч жок');
     return ListView.builder(
       padding: const EdgeInsets.all(14),
       itemCount: _pendingSellers.length,
@@ -1039,15 +1042,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   Widget _buildRequestCard(SellerModel s) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final iconBg    = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFFFF8F0);
+    final badgeBg   = isDark ? const Color(0xFF2C1E0A) : const Color(0xFFFFF3E0);
+    final rejectBg  = isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE);
+    final approveBg = isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 210, 171, 171),
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],
@@ -1060,30 +1070,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               Container(
                 width: 46,
                 height: 46,
-                decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 200, 173, 143),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Center(
-                    child: Text('🏪', style: TextStyle(fontSize: 24))),
+                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+                child: const Center(child: Text('🏪', style: TextStyle(fontSize: 24))),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.shopName, style: AppTextStyles.labelLarge),
+                    Text(s.shopName,
+                        style: AppTextStyles.labelLarge.copyWith(
+                            color: isDark ? Colors.white : AppColors.black)),
                     Text(s.name,
-                        style: AppTextStyles.labelSmall
-                            .copyWith(color: AppColors.grey500)),
+                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 203, 171, 134),
-                    borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(20)),
                 child: const Text('⏳ Жаңы',
                     style: TextStyle(fontSize: 12, color: AppColors.primary)),
               ),
@@ -1091,8 +1096,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           ),
           const SizedBox(height: 10),
           Text(s.phone,
-              style:
-                  AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+              style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -1102,12 +1106,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 247, 91, 91),
-                        borderRadius: BorderRadius.circular(10)),
+                        color: rejectBg, borderRadius: BorderRadius.circular(10)),
                     child: Center(
                         child: Text('❌  Четке кагуу',
-                            style: AppTextStyles.labelMedium
-                                .copyWith(color: AppColors.error))),
+                            style: AppTextStyles.labelMedium.copyWith(color: AppColors.error))),
                   ),
                 ),
               ),
@@ -1118,12 +1120,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 50, 221, 122),
-                        borderRadius: BorderRadius.circular(10)),
+                        color: approveBg, borderRadius: BorderRadius.circular(10)),
                     child: Center(
                         child: Text('✅  Бекитүү',
-                            style: AppTextStyles.labelMedium
-                                .copyWith(color: AppColors.success))),
+                            style: AppTextStyles.labelMedium.copyWith(color: AppColors.success))),
                   ),
                 ),
               ),
@@ -1135,36 +1135,37 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   // ══════════════════════════════════════════════════════
-  // ✅ SELLERЛЕР TAB — ИЗДӨӨ МЕНЕН
+  // ✅ SELLERЛЕР TAB
   // ══════════════════════════════════════════════════════
 
   Widget _buildApprovedTab() {
     final list = _filteredApproved;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final barBg    = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final fieldFill = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
+
     return Column(
       children: [
-        // ── Издөө талаасы ──
         Container(
-          color: const Color.fromARGB(255, 141, 136, 175),
+          color: barBg,
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: TextField(
             controller: _searchCtrl,
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(
+                fontSize: 14, color: isDark ? Colors.white : AppColors.black),
             decoration: InputDecoration(
               hintText: 'Дүкөн аты, номер, контейнер...',
               hintStyle: TextStyle(color: AppColors.grey400, fontSize: 14),
-              prefixIcon:
-                  const Icon(Icons.search, color: AppColors.grey400, size: 20),
+              prefixIcon: const Icon(Icons.search, color: AppColors.grey400, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? GestureDetector(
                       onTap: () => _searchCtrl.clear(),
-                      child: const Icon(Icons.close,
-                          color: Color.fromARGB(255, 5, 13, 28), size: 18),
+                      child: const Icon(Icons.close, color: AppColors.grey400, size: 18),
                     )
                   : null,
               filled: true,
-              fillColor: const Color.fromARGB(255, 227, 231, 239),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              fillColor: fieldFill,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -1172,21 +1173,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             ),
           ),
         ),
-        // ── Натыйжа саны ──
         if (_searchQuery.isNotEmpty)
           Container(
-            color: const Color.fromARGB(255, 244, 236, 236),
+            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F7FF),
             padding: const EdgeInsets.only(left: 14, bottom: 8),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Табылды: ${list.length} seller',
-                style: AppTextStyles.labelSmall
-                    .copyWith(color: const Color.fromARGB(255, 47, 99, 201)),
+                style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
               ),
             ),
           ),
-        // ── Тизме ──
         Expanded(
           child: list.isEmpty
               ? _buildEmpty(
@@ -1206,8 +1204,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   Widget _buildSellerCard(SellerModel s) {
-    final paid = s.currentMonthPaid;
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final nameColor = isDark ? Colors.white : AppColors.black;
+    final paid      = s.currentMonthPaid;
     final isBlocked = s.status == SellerStatus.blocked;
+    final iconBg    = isDark
+        ? const Color(0xFF2C2C2C)
+        : isBlocked ? const Color(0xFFF0F0F0) : const Color(0xFFFFF8F0);
 
     return GestureDetector(
       onTap: () => _showSellerProducts(s),
@@ -1215,11 +1219,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 188, 173, 173),
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isBlocked
-                ? Colors.grey.withValues(alpha: 0.4)
+                ? AppColors.grey400.withValues(alpha: 0.4)
                 : paid
                     ? AppColors.success.withValues(alpha: 0.3)
                     : AppColors.error.withValues(alpha: 0.3),
@@ -1227,7 +1231,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2))
           ],
@@ -1241,11 +1245,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: isBlocked
-                        ? const Color(0xFFF0F0F0)
-                        : const Color(0xFFFFF8F0),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      color: iconBg, borderRadius: BorderRadius.circular(12)),
                   child: Center(
                     child: Text(
                       isBlocked
@@ -1255,7 +1255,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                               : '🏪'),
                       style: TextStyle(
                           fontSize: isBlocked ? 22 : 18,
-                          fontWeight: FontWeight.bold),
+                          fontWeight: FontWeight.bold,
+                          color: nameColor),
                     ),
                   ),
                 ),
@@ -1264,10 +1265,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.shopName, style: AppTextStyles.labelLarge),
+                      Text(s.shopName,
+                          style: AppTextStyles.labelLarge.copyWith(color: nameColor)),
                       Text(s.name,
-                          style: AppTextStyles.labelSmall
-                              .copyWith(color: AppColors.grey500)),
+                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                     ],
                   ),
                 ),
@@ -1278,21 +1279,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                     const SizedBox(height: 4),
                     if (s.hasCard)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: s.autoPayEnabled
-                              ? const Color.fromARGB(255, 24, 34, 28)
-                              : const Color.fromARGB(255, 211, 187, 187),
+                              ? (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5))
+                              : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           s.autoPayEnabled ? '🔄 Авто' : '⏸ Токтоп',
                           style: TextStyle(
                             fontSize: 10,
-                            color: s.autoPayEnabled
-                                ? AppColors.success
-                                : AppColors.grey500,
+                            color: s.autoPayEnabled ? AppColors.success : AppColors.grey500,
                           ),
                         ),
                       ),
@@ -1302,17 +1301,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              s.containerNumber.isNotEmpty
-                  ? s.containerNumber
-                  : 'Контейнер жок',
+              s.containerNumber.isNotEmpty ? s.containerNumber : 'Контейнер жок',
               style: AppTextStyles.labelSmall.copyWith(
-                color: s.containerNumber.isEmpty
-                    ? AppColors.error
-                    : AppColors.grey600,
+                color: s.containerNumber.isEmpty ? AppColors.error : AppColors.grey500,
               ),
             ),
             const SizedBox(height: 12),
-            const Divider(height: 1),
+            Divider(height: 1, color: isDark ? const Color(0xFF2C2C2C) : AppColors.grey200),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -1323,62 +1318,57 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                     label: paid ? '❌ Төлөм алып салуу' : '💰 Төлөдү',
                     color: paid ? AppColors.error : AppColors.success,
                     bgColor: paid
-                        ? const Color.fromARGB(255, 255, 253, 253)
-                        : const Color(0xFFEEFFF5),
+                        ? (isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE))
+                        : (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5)),
                     onTap: () => _markPayment(s, !paid),
                   ),
                 _actionButton(
                   label: '📞 Номер',
                   color: AppColors.primary,
-                  bgColor: const Color.fromARGB(255, 211, 179, 179),
+                  bgColor: isDark ? const Color(0xFF2C1E0A) : const Color(0xFFFFF3E0),
                   onTap: () => _editPhone(s),
                 ),
                 _actionButton(
                   label: '🏪 Контейнер',
                   color: const Color(0xFF7C3AED),
-                  bgColor: const Color.fromARGB(255, 123, 103, 222),
+                  bgColor: isDark ? const Color(0xFF1A1040) : const Color(0xFFF5F3FF),
                   onTap: () => _editContainer(s),
                 ),
                 _actionButton(
                   label: s.hasLocation ? '📍 Локация бар' : '📍 Локация кошуу',
-                  color: s.hasLocation
-                      ? AppColors.success
-                      : const Color(0xFF7C3AED),
+                  color: s.hasLocation ? AppColors.success : const Color(0xFF7C3AED),
                   bgColor: s.hasLocation
-                      ? const Color(0xFFEEFFF5)
-                      : const Color(0xFFF5F3FF),
+                      ? (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5))
+                      : (isDark ? const Color(0xFF1A1040) : const Color(0xFFF5F3FF)),
                   onTap: () => _openMapPicker(s),
                 ),
                 _actionButton(
                   label: '🔑 Пароль',
                   color: const Color(0xFF0369A1),
-                  bgColor: const Color(0xFFE0F2FE),
+                  bgColor: isDark ? const Color(0xFF0A1F2C) : const Color(0xFFE0F2FE),
                   onTap: () => _resetPassword(s),
                 ),
                 if (s.hasCard)
                   _actionButton(
-                    label: s.autoPayEnabled
-                        ? '⛔ Авто токтотуу'
-                        : '▶️ Авто иштетүү',
-                    color:
-                        s.autoPayEnabled ? AppColors.error : AppColors.success,
+                    label: s.autoPayEnabled ? '⛔ Авто токтотуу' : '▶️ Авто иштетүү',
+                    color: s.autoPayEnabled ? AppColors.error : AppColors.success,
                     bgColor: s.autoPayEnabled
-                        ? const Color(0xFFFFEEEE)
-                        : const Color(0xFFEEFFF5),
+                        ? (isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE))
+                        : (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5)),
                     onTap: () => _toggleSellerAutoPay(s),
                   ),
                 _actionButton(
                   label: isBlocked ? '🔓 Блоктон чыгаруу' : '🔒 Блоктоо',
                   color: isBlocked ? AppColors.success : AppColors.error,
                   bgColor: isBlocked
-                      ? const Color(0xFFEEFFF5)
-                      : const Color(0xFFFFEEEE),
+                      ? (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5))
+                      : (isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE)),
                   onTap: () => _toggleBlock(s),
                 ),
                 _actionButton(
                   label: '🗑️ Өчүрүү',
                   color: AppColors.error,
-                  bgColor: const Color(0xFFFFEEEE),
+                  bgColor: isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE),
                   onTap: () => _delete(s),
                 ),
               ],
@@ -1395,6 +1385,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
 
   Widget _buildAllTab() {
     if (_allSellers.isEmpty) return _buildEmpty('👥', 'Seller жок');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView.builder(
       padding: const EdgeInsets.all(14),
       itemCount: _allSellers.length,
@@ -1404,11 +1395,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 19, 16, 16),
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                   blurRadius: 6,
                   offset: const Offset(0, 2))
             ],
@@ -1421,10 +1412,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.shopName, style: AppTextStyles.labelLarge),
+                    Text(s.shopName,
+                        style: AppTextStyles.labelLarge.copyWith(
+                            color: isDark ? Colors.white : AppColors.black)),
                     Text(s.phone,
-                        style: AppTextStyles.labelSmall
-                            .copyWith(color: AppColors.grey500)),
+                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                   ],
                 ),
               ),
@@ -1446,9 +1438,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           .from('products')
           .stream(primaryKey: ['id']).order('created_at', ascending: false),
       builder: (context, snap) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary));
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
         }
         if (snap.hasError) {
           return Center(
@@ -1463,13 +1455,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         if (products.isEmpty) return _buildEmpty('📦', 'Товар жок');
 
         final blocked = products.where((p) => p['is_blocked'] == true).toList();
-        final active = products.where((p) => p['is_blocked'] != true).toList();
-        final sorted = [...blocked, ...active];
+        final active  = products.where((p) => p['is_blocked'] != true).toList();
+        final sorted  = [...blocked, ...active];
 
         return Column(
           children: [
             Container(
-              color: const Color.fromARGB(255, 81, 70, 70),
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
@@ -1495,22 +1487,29 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   Widget _buildProductCard(Map<String, dynamic> product) {
-    final name = product['title'] as String? ?? 'Аты жок';
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final nameColor = isDark ? Colors.white : AppColors.black;
+    final name      = product['title'] as String? ?? 'Аты жок';
+    final price     = (product['price'] as num?)?.toDouble() ?? 0;
     final isBlocked = product['is_blocked'] as bool? ?? false;
-    final inStock = (product['in_stock'] as num?)?.toInt() ?? 0;
-    final images = product['images'] as List<dynamic>? ?? [];
-    final imageUrl = images.isNotEmpty ? images.first as String : '';
+    final inStock   = (product['in_stock'] as num?)?.toInt() ?? 0;
+    final images    = product['images'] as List<dynamic>? ?? [];
+    final imageUrl  = images.isNotEmpty ? images.first as String : '';
+    final imgBg     = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFFFF8F0);
+    final blockBtnBg = isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE);
+    final unblockBtnBg = isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5);
+    final deleteBg  = isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 159, 146, 146),
+        color: cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isBlocked
               ? AppColors.error.withValues(alpha: 0.4)
-              : const Color.fromARGB(255, 189, 193, 202),
+              : (isDark ? const Color(0xFF2C2C2C) : AppColors.grey200),
           width: isBlocked ? 1.5 : 1,
         ),
       ),
@@ -1519,36 +1518,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: imageUrl.isNotEmpty
-              ? Image.network(
-                  imageUrl,
-                  width: 46,
-                  height: 46,
-                  fit: BoxFit.cover,
+              ? Image.network(imageUrl, width: 46, height: 46, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    width: 46,
-                    height: 46,
-                    color: isBlocked
-                        ? const Color.fromARGB(255, 40, 212, 192)
-                        : const Color(0xFFFFF8F0),
+                    width: 46, height: 46, color: imgBg,
                     child: Center(
-                      child: Text(isBlocked ? '🔒' : '📦',
-                          style: const TextStyle(fontSize: 22)),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 46,
-                  height: 46,
-                  color: isBlocked
-                      ? const Color(0xFFFFEEEE)
-                      : const Color(0xFFFFF8F0),
+                        child: Text(isBlocked ? '🔒' : '📦',
+                            style: const TextStyle(fontSize: 22))),
+                  ))
+              : Container(width: 46, height: 46, color: imgBg,
                   child: Center(
-                    child: Text(isBlocked ? '🔒' : '📦',
-                        style: const TextStyle(fontSize: 22)),
-                  ),
-                ),
+                      child: Text(isBlocked ? '🔒' : '📦',
+                          style: const TextStyle(fontSize: 22)))),
         ),
-        title: Text(name, style: AppTextStyles.labelLarge),
+        title: Text(name, style: AppTextStyles.labelLarge.copyWith(color: nameColor)),
         subtitle: Text('${price.toInt()} с • $inStock шт',
             style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
         trailing: Row(
@@ -1557,12 +1539,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             GestureDetector(
               onTap: () => _toggleBlockProduct(product),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: isBlocked
-                      ? const Color.fromARGB(255, 36, 36, 36)
-                      : const Color.fromARGB(255, 156, 214, 234),
+                  color: isBlocked ? unblockBtnBg : blockBtnBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -1576,14 +1555,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             GestureDetector(
               onTap: () => _deleteProduct(product),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 101, 61, 61),
-                    borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: deleteBg, borderRadius: BorderRadius.circular(8)),
                 child: Text('🗑️',
-                    style: AppTextStyles.labelSmall
-                        .copyWith(color: AppColors.error)),
+                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.error)),
               ),
             ),
           ],
@@ -1597,16 +1572,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   // ══════════════════════════════════════════════════════
 
   Widget _buildPaymentsTab() {
-    final now = DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final now     = DateTime.now();
     final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final paid = _approvedSellers.where((s) => s.currentMonthPaid).toList();
+    final paid   = _approvedSellers.where((s) => s.currentMonthPaid).toList();
     final unpaid = _approvedSellers
         .where((s) => !s.currentMonthPaid && s.status == SellerStatus.approved)
         .toList();
-    final totalExpected = _approvedSellers
-            .where((s) => s.status == SellerStatus.approved)
-            .length *
-        2000;
+    final totalExpected =
+        _approvedSellers.where((s) => s.status == SellerStatus.approved).length * 2000;
     final totalReceived = paid.length * 2000;
 
     return SingleChildScrollView(
@@ -1628,34 +1603,28 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('$currentMonth — Ай статистикасы',
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 13)),
+                    style: const TextStyle(color: Colors.white70, fontSize: 13)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                        child: _payStatCard(
-                            'Түштү', '$totalReceived сом', AppColors.success)),
+                    Expanded(child: _payStatCard('Түштү', '$totalReceived сом', AppColors.success)),
                     const SizedBox(width: 10),
-                    Expanded(
-                        child: _payStatCard(
-                            'Күтүлөт', '$totalExpected сом', Colors.white70)),
+                    Expanded(child: _payStatCard('Күтүлөт', '$totalExpected сом', Colors.white70)),
                     const SizedBox(width: 10),
-                    Expanded(
-                        child: _payStatCard('Карызда',
-                            '${unpaid.length} seller', AppColors.error)),
+                    Expanded(child: _payStatCard('Карызда', '${unpaid.length} seller', AppColors.error)),
                   ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
+          // ── Admin картасы ──
           GestureDetector(
             onTap: _showAdminCardSheet,
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: _adminCardMasked != null
@@ -1671,11 +1640,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Менин картам (кириш)',
-                            style: AppTextStyles.labelLarge),
+                        Text('Менин картам (кириш)',
+                            style: AppTextStyles.labelLarge.copyWith(
+                                color: isDark ? Colors.white : AppColors.black)),
                         Text(
-                          _adminCardMasked ??
-                              'Карта байланган эмес — басып кошуңуз',
+                          _adminCardMasked ?? 'Карта байланган эмес — басып кошуңуз',
                           style: AppTextStyles.bodySmall.copyWith(
                             color: _adminCardMasked != null
                                 ? AppColors.success
@@ -1685,8 +1654,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios,
-                      size: 16, color: AppColors.grey400),
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.grey400),
                 ],
               ),
             ),
@@ -1694,14 +1662,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           const SizedBox(height: 20),
           if (paid.isNotEmpty) ...[
             Text('✅ Төлөгөндөр (${paid.length})',
-                style: AppTextStyles.headingSmall),
+                style: AppTextStyles.headingSmall.copyWith(
+                    color: isDark ? Colors.white : AppColors.black)),
             const SizedBox(height: 10),
             ...paid.map((s) => _buildPaymentRow(s, true)),
             const SizedBox(height: 16),
           ],
           if (unpaid.isNotEmpty) ...[
             Text('❌ Төлөбөгөндөр (${unpaid.length})',
-                style: AppTextStyles.headingSmall),
+                style: AppTextStyles.headingSmall.copyWith(
+                    color: isDark ? Colors.white : AppColors.black)),
             const SizedBox(height: 10),
             ...unpaid.map((s) => _buildPaymentRow(s, false)),
           ],
@@ -1720,23 +1690,31 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           const SizedBox(height: 4),
           Text(value,
-              style: TextStyle(
-                  color: color, fontSize: 13, fontWeight: FontWeight.bold)),
+              style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
   Widget _buildPaymentRow(SellerModel s, bool paid) {
+    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final nameColor = isDark ? Colors.white : AppColors.black;
+    final autoBtnBg = s.autoPayEnabled
+        ? (isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE))
+        : (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5));
+    final markBtnBg = paid
+        ? (isDark ? const Color(0xFF2C1010) : const Color(0xFFFFEEEE))
+        : (isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: paid
@@ -1752,21 +1730,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.shopName, style: AppTextStyles.labelMedium),
+                Text(s.shopName,
+                    style: AppTextStyles.labelMedium.copyWith(color: nameColor)),
                 Row(
                   children: [
                     Text(s.phone,
-                        style: AppTextStyles.labelSmall
-                            .copyWith(color: AppColors.grey500)),
+                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                     if (s.hasCard) ...[
                       const SizedBox(width: 6),
                       Text(
                         s.autoPayEnabled ? '🔄 Авто' : '⏸ Авто токтоп',
                         style: TextStyle(
                           fontSize: 10,
-                          color: s.autoPayEnabled
-                              ? AppColors.success
-                              : AppColors.grey400,
+                          color: s.autoPayEnabled ? AppColors.success : AppColors.grey400,
                         ),
                       ),
                     ],
@@ -1781,17 +1757,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
-                  color: s.autoPayEnabled
-                      ? const Color(0xFFFFEEEE)
-                      : const Color(0xFFEEFFF5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                    color: autoBtnBg, borderRadius: BorderRadius.circular(8)),
                 child: Text(
                   s.autoPayEnabled ? '⛔ Токтот' : '▶️ Иштет',
                   style: TextStyle(
                     fontSize: 11,
-                    color:
-                        s.autoPayEnabled ? AppColors.error : AppColors.success,
+                    color: s.autoPayEnabled ? AppColors.error : AppColors.success,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1803,9 +1774,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
-                color: paid ? const Color(0xFFFFEEEE) : const Color(0xFFEEFFF5),
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  color: markBtnBg, borderRadius: BorderRadius.circular(8)),
               child: Text(
                 paid ? 'Алып сал' : 'Төлөдү',
                 style: TextStyle(
@@ -1826,31 +1795,31 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   // ══════════════════════════════════════════════════════
 
   Widget _statusBadge(SellerStatus status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     String text;
     Color color;
     Color bg;
     switch (status) {
       case SellerStatus.pending:
-        text = '⏳ Күтүүдө';
+        text  = '⏳ Күтүүдө';
         color = AppColors.primary;
-        bg = const Color(0xFFFFF8F0);
+        bg    = isDark ? const Color(0xFF2C1E0A) : const Color(0xFFFFF8F0);
       case SellerStatus.approved:
-        text = '✅ Активдүү';
+        text  = '✅ Активдүү';
         color = AppColors.success;
-        bg = const Color(0xFFEEFFF5);
+        bg    = isDark ? const Color(0xFF0A2C1A) : const Color(0xFFEEFFF5);
       case SellerStatus.rejected:
-        text = '❌ Четке';
+        text  = '❌ Четке';
         color = AppColors.error;
-        bg = const Color(0xFFFFEEEE);
+        bg    = isDark ? const Color(0xFF2C0A0A) : const Color(0xFFFFEEEE);
       case SellerStatus.blocked:
-        text = '🔒 Блок';
+        text  = '🔒 Блок';
         color = AppColors.grey500;
-        bg = const Color(0xFFF0F0F0);
+        bg    = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Text(text, style: AppTextStyles.labelSmall.copyWith(color: color)),
     );
   }
@@ -1865,10 +1834,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-            color: bgColor, borderRadius: BorderRadius.circular(10)),
-        child:
-            Text(label, style: AppTextStyles.labelSmall.copyWith(color: color)),
+        decoration:
+            BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
+        child: Text(label, style: AppTextStyles.labelSmall.copyWith(color: color)),
       ),
     );
   }
@@ -1879,8 +1847,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20)),
-      child:
-          Text(label, style: AppTextStyles.labelSmall.copyWith(color: color)),
+      child: Text(label, style: AppTextStyles.labelSmall.copyWith(color: color)),
     );
   }
 
@@ -1892,8 +1859,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           Text(icon, style: const TextStyle(fontSize: 64)),
           const SizedBox(height: 16),
           Text(text,
-              style: AppTextStyles.headingSmall
-                  .copyWith(color: AppColors.grey400)),
+              style: AppTextStyles.headingSmall.copyWith(color: AppColors.grey400)),
         ],
       ),
     );
@@ -1904,8 +1870,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         hintText: hint,
         counterText: '',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       );
 
   void _showSnack(String msg, Color color) {
@@ -1924,8 +1889,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child:
-                const Text('Жок', style: TextStyle(color: AppColors.grey500)),
+            child: const Text('Жок', style: TextStyle(color: AppColors.grey500)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -1936,6 +1900,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     );
   }
 }
+
+// ══════════════════════════════════════════════════════
+// КАРДАРЛАР БИЛДИРҮҮЛӨРҮ
+// ══════════════════════════════════════════════════════
 
 class _SuggestionsPanelSheet extends StatefulWidget {
   @override
@@ -1969,14 +1937,10 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
 
   String _typeLabel(String? type) {
     switch (type) {
-      case 'new_feature':
-        return '🆕 Жаңы нерсе';
-      case 'missing_category':
-        return '📂 Категория жетишпейт';
-      case 'low_stock':
-        return '📦 Товар аз';
-      default:
-        return '💬 Башка';
+      case 'new_feature':      return '🆕 Жаңы нерсе';
+      case 'missing_category': return '📂 Категория жетишпейт';
+      case 'low_stock':        return '📦 Товар аз';
+      default:                 return '💬 Башка';
     }
   }
 
@@ -2016,8 +1980,7 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
           ),
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white))
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
                 : _suggestions.isEmpty
                     ? const Center(
                         child: Text('Билдирүү жок',
@@ -2027,8 +1990,7 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
                         itemCount: _suggestions.length,
                         itemBuilder: (_, i) {
                           final s = _suggestions[i];
-                          final time = DateTime.tryParse(
-                              s['created_at'] as String? ?? '');
+                          final time = DateTime.tryParse(s['created_at'] as String? ?? '');
                           final timeStr = time != null
                               ? '${time.day}/${time.month} ${time.hour}:${time.minute.toString().padLeft(2, '0')}'
                               : '';
@@ -2048,36 +2010,29 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color:
-                                            Colors.blue.withValues(alpha: 0.2),
+                                        color: Colors.blue.withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
                                         _typeLabel(s['type'] as String?),
                                         style: const TextStyle(
-                                            color: Colors.lightBlue,
-                                            fontSize: 11),
+                                            color: Colors.lightBlue, fontSize: 11),
                                       ),
                                     ),
                                     const Spacer(),
                                     Text(timeStr,
                                         style: const TextStyle(
-                                            color: Colors.white38,
-                                            fontSize: 11)),
+                                            color: Colors.white38, fontSize: 11)),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
-                                  '👤 ${s['user_name'] ?? 'Белгисиз'}',
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 12),
-                                ),
+                                Text('👤 ${s['user_name'] ?? 'Белгисиз'}',
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12)),
                                 const SizedBox(height: 4),
-                                Text(
-                                  s['message'] as String? ?? '',
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 14),
-                                ),
+                                Text(s['message'] as String? ?? '',
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 14)),
                               ],
                             ),
                           );

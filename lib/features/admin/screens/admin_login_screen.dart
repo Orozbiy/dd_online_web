@@ -202,7 +202,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
                     // ── "Admin панели" — АДАПТИВДҮҮ ──
                     Text(
-                      'Admin панели',
+                      'Admin',
                       style: AppTextStyles.headingLarge.copyWith(color: titleColor),
                     ),
                     const SizedBox(height: 8),

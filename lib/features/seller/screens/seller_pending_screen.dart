@@ -1,13 +1,63 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
-import '../../home/screens/home_screen.dart';
-import 'seller_login_screen.dart';
 import '../../../core/supabase_client.dart';
+import '../models/seller_model.dart';
+import '../services/seller_service.dart';
+import '../../home/screens/home_screen.dart';
+import 'seller_dashboard_screen.dart';
+import 'seller_login_screen.dart';
 
-class SellerPendingScreen extends StatelessWidget {
+class SellerPendingScreen extends StatefulWidget {
   const SellerPendingScreen({super.key});
+
+  @override
+  State<SellerPendingScreen> createState() => _SellerPendingScreenState();
+}
+
+class _SellerPendingScreenState extends State<SellerPendingScreen> {
+  Timer? _timer;
+  final _sellerService = SellerService();
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Ар 5 секундда статусту текшер
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _checkStatus());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final seller = await _sellerService.getSellerByUid(user.id);
+    if (!mounted || seller == null) return;
+if (seller.status == SellerStatus.approved) {
+      _timer?.cancel();
+      // ✅ Активдештирилди — dashboard га өт
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => SellerDashboardScreen(uid: seller.uid)),
+        (route) => false,
+      );
+    } else if (seller.status == SellerStatus.rejected) {
+      _timer?.cancel();
+      // ✅ Четке кагылды — rejected экранга өт
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const SellerRejectedScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +106,9 @@ class SellerPendingScreen extends StatelessWidget {
                 style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey500, height: 1.5),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 16),
+              // ✅ Жүктөлүп жатканын көрсөт
+              const CircularProgressIndicator(color: AppColors.primary),
               const Spacer(flex: 3),
               SizedBox(
                 width: double.infinity, height: 54,

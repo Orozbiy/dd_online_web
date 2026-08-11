@@ -1,5 +1,4 @@
 // lib/features/chat/models/message_model.dart
-// ✅ message_type кошулду: 'text' | 'image' | 'audio' | 'call_request'
 
 class MessageModel {
   final String  id;
@@ -12,8 +11,10 @@ class MessageModel {
   final bool    isRead;
   final String? replyToId;
   final String? replyToText;
-  final String  messageType; // ✅ ЖАҢЫ: 'text' | 'image' | 'audio' | 'call_request'
-  final String? callStatus;  // ✅ ЖАҢЫ: 'pending' | 'accepted' | 'declined'
+  final String  messageType;
+  final String? callStatus;
+  final bool    isEdited;
+  final DateTime? editedAt;
 
   MessageModel({
     required this.id,
@@ -28,6 +29,8 @@ class MessageModel {
     this.replyToText,
     this.messageType = 'text',
     this.callStatus,
+    this.isEdited = false,
+    this.editedAt,
   });
 
   bool get isCallRequest => messageType == 'call_request';
@@ -46,11 +49,15 @@ class MessageModel {
       timestamp: data['created_at'] != null
           ? DateTime.parse(data['created_at'] as String).toLocal()
           : DateTime.now(),
-      isRead:        data['is_read']        as bool? ?? false,
-      replyToId:     data['reply_to_id']    as String?,
-      replyToText:   data['reply_to_text']  as String?,
-      messageType:   data['message_type']   as String? ?? 'text', // ✅
-      callStatus:    data['call_status']    as String?,           // ✅
+      isRead:      data['is_read']      as bool? ?? false,
+      replyToId:   data['reply_to_id']  as String?,
+      replyToText: data['reply_to_text'] as String?,
+      messageType: data['message_type'] as String? ?? 'text',
+      callStatus:  data['call_status']  as String?,
+      isEdited:    data['is_edited']    as bool? ?? false,
+      editedAt: data['edited_at'] != null
+          ? DateTime.parse(data['edited_at'] as String).toLocal()
+          : null,
     );
   }
 
@@ -73,6 +80,8 @@ class MessageModel {
     String?   replyToText,
     String?   messageType,
     String?   callStatus,
+    bool?     isEdited,
+    DateTime? editedAt,
   }) {
     return MessageModel(
       id:            id            ?? this.id,
@@ -87,6 +96,8 @@ class MessageModel {
       replyToText:   replyToText   ?? this.replyToText,
       messageType:   messageType   ?? this.messageType,
       callStatus:    callStatus    ?? this.callStatus,
+      isEdited:      isEdited      ?? this.isEdited,
+      editedAt:      editedAt      ?? this.editedAt,
     );
   }
 }

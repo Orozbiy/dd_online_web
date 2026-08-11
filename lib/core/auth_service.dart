@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart'; // kIsWeb үчүн
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
 import '../services/notification_service.dart';
@@ -17,9 +16,6 @@ class AuthService {
   /// Redirect URLs менен так дал келиши керек.
   static const String _redirectUrl = 'io.supabase.ddonline://login-callback/';
 
-  /// Веб үчүн redirect URL.
-static const String _webRedirectUrl = 'https://dd-online-web.web.app/auth/callback';
-
   /// Учурдагы Supabase колдонуучусу (же null).
   User? get currentUser => supabase.auth.currentUser;
 
@@ -35,20 +31,21 @@ static const String _webRedirectUrl = 'https://dd-online-web.web.app/auth/callba
   /// Системалык браузерде Google account picker ачылат.
   /// Натыйжа [authStateChanges] аркылуу [AuthChangeEvent.signedIn]
   /// окуясы катары келет.
-  Future<void> signInWithGoogle() async {
-    try {
-      await supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: kIsWeb ? _webRedirectUrl : _redirectUrl,
-        authScreenLaunchMode: kIsWeb
-            ? LaunchMode.platformDefault
-            : LaunchMode.externalApplication,
-        queryParams: const {'prompt': 'select_account'},
-      );
-    } catch (e) {
-      throw AuthException('Кирүүдө ката кетти: $e');
-    }
+ Future<void> signInWithGoogle() async {
+  try {
+    await supabase.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: _redirectUrl,
+      authScreenLaunchMode: LaunchMode.externalApplication, // ✅ inAppWebView эмес
+      queryParams: const {
+        'prompt': 'select_account',
+        'access_type': 'offline',
+      },
+    );
+  } catch (e) {
+    throw AuthException('Кирүүдө ката кетти: $e');
   }
+}
 
   /// Колдонуучу кирген соң профилди акыркы Google маалыматтары
   /// менен синхрондоо (аты, сүрөтү, email).
@@ -76,9 +73,7 @@ static const String _webRedirectUrl = 'https://dd-online-web.web.app/auth/callba
 
     // ✅ ОҢДОО: Google менен кирген соң FCM токенди сакта
     // Бул болбосо сатуучу жооп жазганда алуучуга уведомления жетпейт
-    if (!kIsWeb) {
-      await NotificationService().saveMyToken();
-    }
+    await NotificationService().saveMyToken();
   }
 
   /// Колдонуучунун ролун (customer/seller/admin) алуу.
@@ -104,9 +99,7 @@ static const String _webRedirectUrl = 'https://dd-online-web.web.app/auth/callba
   /// өчүрөт, антпесе эски колдонуучунун токенине жаны колдонуучунун
   /// push-билдирүүлөрү жетип кетет.
   Future<void> signOut() async {
-    if (!kIsWeb) {
-      await NotificationService().clearMyToken();
-    }
+    await NotificationService().clearMyToken();
     await supabase.auth.signOut();
   }
 }

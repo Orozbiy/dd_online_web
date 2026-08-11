@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/utils/image_utils.dart'; // ← compressStoryImage үчүн
 import '../../stories/models/story_model.dart';
 import '../../stories/services/story_service.dart';
 import '../widgets/admin_story_card.dart';
@@ -40,20 +41,19 @@ class _AdminStoryManagerScreenState extends State<AdminStoryManagerScreen> {
   }
 
   // ─────────────────────────────────────────────
-  // Сүрөт тандоо жана жүктөө
+  // Медиа тандоо жана жүктөө
   // ─────────────────────────────────────────────
   Future<void> _pickAndUpload(ImageSource source, String mediaType) async {
     try {
       XFile? picked;
+
       if (mediaType == 'image') {
-        picked = await _picker.pickImage(
-          source: source,
-          imageQuality: 85,
-          maxWidth: 1080,
-        );
+        // imageQuality жана maxWidth алынды — compressStoryImage өзү башкарат
+        picked = await _picker.pickImage(source: source);
       } else {
         picked = await _picker.pickVideo(source: source);
       }
+
       if (picked == null) return;
 
       setState(() {
@@ -61,7 +61,23 @@ class _AdminStoryManagerScreenState extends State<AdminStoryManagerScreen> {
         _uploadStatus = 'Жүктөлүп жатат...';
       });
 
-      final file  = File(picked.path);
+      File file;
+
+      if (mediaType == 'image') {
+        // ── Сүрөттү оригинал катышта compress кылуу ──
+        final bytes      = await picked.readAsBytes();
+        final compressed = await compressStoryImage(bytes); // ← ОШУ ЖЕР
+
+        // Убактылуу файлга жазуу
+        final tempPath = '${picked.path}_story.jpg';
+        final tempFile = File(tempPath);
+        await tempFile.writeAsBytes(compressed);
+        file = tempFile;
+      } else {
+        // Видеону түздөн-түз берүү — катыш өзүнөн сакталат
+        file = File(picked.path);
+      }
+
       final story = await _service.uploadAndCreateStory(
         file:      file,
         mediaType: mediaType,

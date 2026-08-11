@@ -143,7 +143,7 @@ class ChatModel {
     return '${diff.inDays} ${loc.get('time_day')}';
   }
 
-  /// Контексссиз (кыргызча)
+ /// Контексссиз — тилди SharedPreferences'тан алат
   String get formattedTime {
     final now  = DateTime.now();
     final diff = now.difference(lastTime);
@@ -156,9 +156,9 @@ class ChatModel {
       return '$h:$m';
     }
 
-    if (diff.inMinutes < 1)  return 'Азыр';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} мин';
-    if (diff.inHours   < 24) return '${diff.inHours} саат';
-    return '${diff.inDays} күн';
+    if (diff.inMinutes < 1)  return '•';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours   < 24) return '${diff.inHours}h';
+    return '${diff.inDays}d';
   }
 }

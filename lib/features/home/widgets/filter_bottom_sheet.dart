@@ -64,7 +64,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   late final TextEditingController _minCtrl;
   late final TextEditingController _maxCtrl;
 
-  static const double _maxPrice = 1000000;
+static const double _maxPrice = 100000;
 
   final List<String> sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
@@ -92,12 +92,11 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     _maxCtrl.dispose();
     super.dispose();
   }
-
-  void _reset() {
+void _reset() {
     setState(() {
       _priceRange    = const RangeValues(0, _maxPrice);
       _selectedSizes = [];
-      _sortBy        = 'popular';
+      _sortBy        = 'default';
       _minCtrl.text  = '0';
       _maxCtrl.text  = _maxPrice.toInt().toString();
     });
@@ -107,12 +106,12 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     int count = 0;
     if (_priceRange.start > 0 || _priceRange.end < _maxPrice) count++;
     if (_selectedSizes.isNotEmpty) count++;
-    if (_sortBy != 'popular') count++;
+   if (_sortBy != 'default') count++;
     return count;
   }
 
   String _formatPrice(double price) {
-    if (price >= _maxPrice) return '1 000 000+ с';
+    if (price >= _maxPrice) return '100000 + с';
     final str = price.toInt().toString();
     final buf = StringBuffer();
     for (int i = 0; i < str.length; i++) {
@@ -288,7 +287,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       Expanded(
                         child: _priceField(
                           controller: _maxCtrl,
-                          hint: '1000000',
+                         hint: '100000',
                           isDark: isDark,
                           onChanged: (val) {
                             final v = double.tryParse(val) ?? _maxPrice;

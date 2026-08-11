@@ -16,14 +16,12 @@ class SellerRegisterScreen extends StatefulWidget {
 
 class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   final _nameCtrl            = TextEditingController();
-  final _ageCtrl             = TextEditingController();
-  final _shopNameCtrl        = TextEditingController();
   final _containerCtrl       = TextEditingController();
   final _phoneCtrl           = TextEditingController();
   final _passwordCtrl        = TextEditingController();
   final _passwordConfirmCtrl = TextEditingController();
-  
-  String _storeType   = 'market'; // 'market' | 'private'
+
+  String _storeType   = 'market';
   String? _marketName = 'Дордой базары';
 
   static const List<String> _markets = [
@@ -36,6 +34,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     'Кара-Суу базары',
     'Птичий рынок',
   ];
+
   bool _obscure1  = true;
   bool _obscure2  = true;
   bool _isLoading = false;
@@ -43,8 +42,6 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _ageCtrl.dispose();
-    _shopNameCtrl.dispose();
     _containerCtrl.dispose();
     _phoneCtrl.dispose();
     _passwordCtrl.dispose();
@@ -67,20 +64,16 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   Future<void> _register() async {
     final loc             = AppLocalizations.of(context);
     final name            = _nameCtrl.text.trim();
-    final ageText         = _ageCtrl.text.trim();
-    final shopName        = _shopNameCtrl.text.trim();
     final containerNumber = _containerCtrl.text.trim();
     final localPhone      = _phoneCtrl.text.trim();
     final password        = _passwordCtrl.text;
     final passwordConfirm = _passwordConfirmCtrl.text;
 
     if (name.isEmpty) { _showSnack(loc.get('reg_err_name')); return; }
-    final age = int.tryParse(ageText);
-    if (age == null || age < 14 || age > 100) { _showSnack(loc.get('reg_err_age')); return; }
     if (_storeType == 'market' && (_marketName == null || _marketName!.isEmpty)) {
       _showSnack('Рынок тандаңыз'); return;
     }
-    if (shopName.isEmpty && containerNumber.isEmpty) { _showSnack(loc.get('reg_err_container')); return; }
+    if (containerNumber.isEmpty) { _showSnack(loc.get('reg_err_container')); return; }
     if (localPhone.length < 9) { _showSnack(loc.get('reg_err_phone')); return; }
 
     final passError = SellerService.validatePassword(password);
@@ -94,9 +87,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         phone: formattedPhone,
         password: password,
         fullName: name,
-        age: age,
-       containerNumber: containerNumber,
-        shopName: shopName,
+        age: 18,
+        containerNumber: containerNumber,
+        shopName: '',
         storeType: _storeType,
         marketName: _storeType == 'market' ? _marketName : null,
       );
@@ -124,7 +117,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     TextStyle? prefixStyle,
     Widget? suffixIcon,
   }) {
-    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
     final fillColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
     return InputDecoration(
       hintText:    hint,
@@ -207,16 +200,6 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ── ЖАШЫ ──
-              _label(context, loc.get('reg_label_age')),
-              TextField(
-                controller: _ageCtrl,
-                keyboardType: TextInputType.number,
-                style: AppTextStyles.bodyMedium.copyWith(color: textColor),
-                decoration: _decoration(context, hint: loc.get('reg_hint_age')),
-              ),
-              const SizedBox(height: 20),
-
               // ── КОНТЕЙНЕР ──
               _label(context, loc.get('reg_label_container')),
               TextField(
@@ -226,17 +209,6 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ── ДҮКӨН АТЫ ──
-              _label(context, loc.get('reg_label_shop')),
-              TextField(
-                controller: _shopNameCtrl,
-                style: AppTextStyles.bodyMedium.copyWith(color: textColor),
-                decoration: _decoration(context, hint: loc.get('reg_hint_shop')),
-              ),
-              const SizedBox(height: 20),
-
-
-
               // ── ДҮКӨН ТҮРҮ ──
               _label(context, 'Дүкөн түрүңүздү тандаңыз'),
               Row(
@@ -244,7 +216,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() {
-                        _storeType = 'market';
+                        _storeType  = 'market';
                         _marketName = 'Дордой базары';
                       }),
                       child: Container(
@@ -274,7 +246,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() {
-                        _storeType = 'private';
+                        _storeType  = 'private';
                         _marketName = null;
                       }),
                       child: Container(
@@ -304,7 +276,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               ),
               const SizedBox(height: 20),
 
-              // ── РЫНОК ТАНДОО (market болсо гана) ──
+              // ── РЫНОК ТАНДОО ──
               if (_storeType == 'market') ...[
                 _label(context, 'Рынок тандаңыз'),
                 Container(
@@ -319,10 +291,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                       isExpanded: true,
                       dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
                       style: AppTextStyles.bodyMedium.copyWith(color: textColor),
-                      items: _markets.map((m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(m),
-                      )).toList(),
+                      items: _markets
+                          .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                          .toList(),
                       onChanged: (val) => setState(() => _marketName = val),
                     ),
                   ),
@@ -386,7 +357,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ── БАСКЫЧ ──
+              // ── КАТТОО БАСКЫЧЫ ──
               SizedBox(
                 height: 54,
                 child: ElevatedButton(

@@ -73,6 +73,64 @@ class CategoryModel {
           SubCategoryModel(id: '1_9',  name: 'Жумушчу кийим',  nameRu: 'Рабочая одежда', icon: '🦺'),
           SubCategoryModel(id: '1_10', name: 'Улуттук кийим',  nameRu: 'Национальная',   icon: '🪭'),
           SubCategoryModel(id: '1_11', name: 'Жоолук/Шарф', nameRu: 'Платок/Шарф', icon: '🧣'),
+          SubCategoryModel(id: '1_12', name: 'Кемер',        nameRu: 'Ремень',       icon: '🪢'),
+          SubCategoryModel(id: '1_13', name: 'Перчатка',     nameRu: 'Перчатки',     icon: '🧤'),
+    SubCategoryModel(
+            id: '1_14', name: 'Баш кийим', nameRu: 'Головные уборы', icon: '🎩',
+            subItems: [
+ 
+              // ── Баары ──
+              SubCategoryModel(id: '1_14_1', name: 'Баары', nameRu: 'Все', icon: '🎩'),
+ 
+              // ── Эркектер ──
+              SubCategoryModel(
+                id: '1_14_2', name: 'Эркектер', nameRu: 'Мужские', icon: '🧢',
+                subItems: [
+                  SubCategoryModel(id: '1_14_2_1', name: 'Жазкы',   nameRu: 'Весенние',     icon: '🌸'),
+                  SubCategoryModel(id: '1_14_2_2', name: 'Жайкы',   nameRu: 'Летние',       icon: '☀️'),
+                  SubCategoryModel(id: '1_14_2_3', name: 'Күзгү',   nameRu: 'Осенние',      icon: '🍂'),
+                  SubCategoryModel(id: '1_14_2_4', name: 'Кышкы',   nameRu: 'Зимние',       icon: '❄️'),
+                  SubCategoryModel(id: '1_14_2_5', name: 'Офистик', nameRu: 'Офисные',      icon: '💼'),
+                  SubCategoryModel(id: '1_14_2_6', name: 'Эс алуу', nameRu: 'Повседневные', icon: '🧢'),
+                  SubCategoryModel(id: '1_14_2_7', name: 'Улуттук', nameRu: 'Национальные', icon: '🎭'),
+                ],
+              ),
+ 
+              // ── Аялдар ──
+              SubCategoryModel(
+                id: '1_14_3', name: 'Аялдар', nameRu: 'Женские', icon: '👒',
+                subItems: [
+                  SubCategoryModel(id: '1_14_3_1', name: 'Жазкы',   nameRu: 'Весенние',     icon: '🌸'),
+                  SubCategoryModel(id: '1_14_3_2', name: 'Жайкы',   nameRu: 'Летние',       icon: '☀️'),
+                  SubCategoryModel(id: '1_14_3_3', name: 'Күзгү',   nameRu: 'Осенние',      icon: '🍂'),
+                  SubCategoryModel(id: '1_14_3_4', name: 'Кышкы',   nameRu: 'Зимние',       icon: '❄️'),
+                  SubCategoryModel(id: '1_14_3_5', name: 'Офистик', nameRu: 'Офисные',      icon: '💼'),
+                  SubCategoryModel(id: '1_14_3_6', name: 'Эс алуу', nameRu: 'Повседневные', icon: '👒'),
+                  SubCategoryModel(id: '1_14_3_7', name: 'Улуттук', nameRu: 'Национальные', icon: '🎭'),
+                ],
+              ),
+ 
+              // ── Балдар ──
+              SubCategoryModel(
+                id: '1_14_4', name: 'Балдар', nameRu: 'Детские', icon: '🧒',
+                subItems: [
+                  SubCategoryModel(id: '1_14_4_1', name: 'Жазкы', nameRu: 'Весенние', icon: '🌸'),
+                  SubCategoryModel(id: '1_14_4_2', name: 'Жайкы', nameRu: 'Летние',   icon: '☀️'),
+                  SubCategoryModel(id: '1_14_4_3', name: 'Күзгү', nameRu: 'Осенние',  icon: '🍂'),
+                  SubCategoryModel(id: '1_14_4_4', name: 'Кышкы', nameRu: 'Зимние',   icon: '❄️'),
+                ],
+              ),
+ 
+              // ── Бөбөктөр ──
+              SubCategoryModel(
+                id: '1_14_5', name: 'Бөбөктөр', nameRu: 'Для малышей', icon: '👶',
+                subItems: [
+                  SubCategoryModel(id: '1_14_5_1', name: 'Жазкы/Жайкы', nameRu: 'Весна/Лето', icon: '🌤️'),
+                  SubCategoryModel(id: '1_14_5_2', name: 'Кышкы',        nameRu: 'Зимние',     icon: '❄️'),
+                ],
+              ),
+            ],
+          ), 
         ],
       ),
 
@@ -110,7 +168,7 @@ class CategoryModel {
             subItems: [
               SubCategoryModel(id: '2_4_1', name: 'Наристе (16-22)',    nameRu: 'Малыши (16-22)',    icon: '👶'),
               SubCategoryModel(id: '2_4_2', name: 'Кичи балдар (23-30)',nameRu: 'Дети (23-30)',      icon: '🧒'),
-              SubCategoryModel(id: '2_4_3', name: 'Мектеп (31-36)',     nameRu: 'Школьники (31-36)', icon: '🎒'),
+              SubCategoryModel(id: '2_4_3', name: 'Мектеп (31-36)',     nameRu: 'Школьники (31-36)', icon: ''),
               SubCategoryModel(id: '2_4_4', name: 'Кышкы',             nameRu: 'Зимняя',            icon: '❄️'),
             ],
           ),
@@ -124,13 +182,30 @@ class CategoryModel {
       const CategoryModel(
         id: '3', name: 'Аксессуарлар', nameRu: 'Аксессуары', icon: '👜', color: 'FFD93D',
         subcategories: [
-          SubCategoryModel(id: '3_1', name: 'Баары',       nameRu: 'Все',          icon: '👜'),
-          SubCategoryModel(id: '3_2', name: 'Сумкалар',    nameRu: 'Сумки',        icon: '🎒'),
-          SubCategoryModel(id: '3_3', name: 'Кол саат',    nameRu: 'Часы',         icon: '⌚'),
-          SubCategoryModel(id: '3_4', name: 'Көз айнек',   nameRu: 'Очки',         icon: '🕶️'),
-          SubCategoryModel(id: '3_5', name: 'Зергерчилик', nameRu: 'Украшения',    icon: '💍'),
-          SubCategoryModel(id: '3_6', name: 'Кемер',       nameRu: 'Ремень',       icon: '🪢'),
-          SubCategoryModel(id: '3_7', name: 'Перчатка', nameRu: 'Перчатки', icon: '🧤'),
+          SubCategoryModel(id: '3_1', name: 'Баары',            nameRu: 'Все',              icon: '👜'),
+          SubCategoryModel(
+            id: '3_2', name: 'Сумкалар', nameRu: 'Сумки', icon: '👜',
+            subItems: [
+              SubCategoryModel(id: '3_2_1', name: 'Жол сумка',    nameRu: 'Сумка',          icon: '👜'),
+              SubCategoryModel(id: '3_2_2', name: 'Рюкзак',       nameRu: 'Рюкзак',         icon: '🎒'),
+              SubCategoryModel(id: '3_2_3', name: 'Капчык',       nameRu: 'Кошелёк',        icon: '👛'),
+              SubCategoryModel(id: '3_2_4', name: 'Портфель',     nameRu: 'Портфель',       icon: '💼'),
+              SubCategoryModel(id: '3_2_5', name: 'Чемодан',      nameRu: 'Чемодан',        icon: '🧳'),
+            ],
+          ),
+          SubCategoryModel(id: '3_3', name: 'Кол саат',       nameRu: 'Часы',             icon: ''),
+          SubCategoryModel(id: '3_4', name: 'Көз айнек',      nameRu: 'Очки',             icon: ''),
+          SubCategoryModel(
+            id: '3_5', name: 'Зергерчилик', nameRu: 'Украшения', icon: '',
+            subItems: [
+              SubCategoryModel(id: '3_5_1', name: 'Шакек',        nameRu: 'Кольца',         icon: ''),
+              SubCategoryModel(id: '3_5_2', name: 'Моончок',      nameRu: 'Ожерелье',       icon: ''),
+              SubCategoryModel(id: '3_5_3', name: 'Сөйкө',        nameRu: 'Серьги',         icon: ''),
+              SubCategoryModel(id: '3_5_4', name: 'Браслет',      nameRu: 'Браслет',        icon: ''),
+              SubCategoryModel(id: '3_5_5', name: 'Брошь',        nameRu: 'Брошь',          icon: ''),
+            ],
+          ),
+          SubCategoryModel(id: '3_6', name: 'Чач жасалгасы', nameRu: 'Украшения для волос', icon: ''),
         ],
       ),
 
@@ -142,7 +217,7 @@ class CategoryModel {
         subcategories: [
           SubCategoryModel(id: '4_1',  name: 'Баары',          nameRu: 'Все',             icon: '📱'),
           SubCategoryModel(id: '4_2',  name: 'Телефондор',     nameRu: 'Телефоны',        icon: '📲'),
-          SubCategoryModel(id: '4_3',  name: 'Ноутбук',        nameRu: 'Ноутбуки',        icon: '💻'),
+          SubCategoryModel(id: '4_3',  name: 'ПК/Ноутбук',        nameRu: 'ПК/Ноутбуки',        icon: '💻'),
           SubCategoryModel(id: '4_4',  name: 'Планшет',        nameRu: 'Планшеты',        icon: '📟'),
           SubCategoryModel(id: '4_5',  name: 'Наушник',        nameRu: 'Наушники',        icon: '🎧'),
           SubCategoryModel(id: '4_6',  name: 'Зарядка/Кабель', nameRu: 'Зарядка/Кабель', icon: '🔌'),
@@ -179,14 +254,14 @@ class CategoryModel {
         id: '6', name: 'Техника', nameRu: 'Бытовая техника', icon: '❄️', color: '52B788',
         subcategories: [
           SubCategoryModel(id: '6_1', name: 'Баары',            nameRu: 'Все',               icon: '❄️'),
-          SubCategoryModel(id: '6_2', name: 'Муздаткыч',        nameRu: 'Холодильник',       icon: '🧊'),
-          SubCategoryModel(id: '6_3', name: 'Кир жуучу машина', nameRu: 'Стиральная машина', icon: '🫧'),
-          SubCategoryModel(id: '6_4', name: 'Телевизор',        nameRu: 'Телевизор',         icon: '📺'),
-          SubCategoryModel(id: '6_5', name: 'Кондиционер',      nameRu: 'Кондиционер',       icon: '🌬️'),
-          SubCategoryModel(id: '6_6', name: 'Газ плита',        nameRu: 'Газовая плита',     icon: '🔥'),
-          SubCategoryModel(id: '6_7', name: 'Микротолкундуу',   nameRu: 'Микроволновка',     icon: '📡'),
-          SubCategoryModel(id: '6_8', name: 'Чаң соргуч',       nameRu: 'Пылесос',           icon: '🌀'),
-          SubCategoryModel(id: '6_9', name: 'Утюг',             nameRu: 'Утюг',              icon: '🧺'),
+          SubCategoryModel(id: '6_2', name: 'Муздаткыч',        nameRu: 'Холодильник',       icon: ''),
+          SubCategoryModel(id: '6_3', name: 'Кир жуучу машина', nameRu: 'Стиральная машина', icon: ''),
+          SubCategoryModel(id: '6_4', name: 'Телевизор',        nameRu: 'Телевизор',         icon: ''),
+          SubCategoryModel(id: '6_5', name: 'Кондиционер',      nameRu: 'Кондиционер',       icon: ''),
+          SubCategoryModel(id: '6_6', name: 'Газ плита',        nameRu: 'Газовая плита',     icon: ''),
+          SubCategoryModel(id: '6_7', name: 'Микротолкундуу',   nameRu: 'Микроволновка',     icon: ''),
+          SubCategoryModel(id: '6_8', name: 'Чаң соргуч',       nameRu: 'Пылесос',           icon: ''),
+          SubCategoryModel(id: '6_9', name: 'Утюг',             nameRu: 'Утюг',              icon: ''),
         ],
       ),
 
@@ -198,7 +273,7 @@ class CategoryModel {
         subcategories: [
           SubCategoryModel(id: '7_1',  name: 'Баары',        nameRu: 'Все',         icon: '⚽'),
           SubCategoryModel(id: '7_2',  name: 'Футбол',       nameRu: 'Футбол',      icon: '⚽'),
-          SubCategoryModel(id: '7_3',  name: 'Баскетбол',    nameRu: 'Баскетбол',   icon: '🏀'),
+  
           SubCategoryModel(id: '7_4',  name: 'Волейбол',     nameRu: 'Волейбол',    icon: '🏐'),
           SubCategoryModel(id: '7_5',  name: 'Тренажер',     nameRu: 'Тренажёр',    icon: '🏋️'),
           SubCategoryModel(id: '7_6',  name: 'Велосипед',    nameRu: 'Велосипед',   icon: '🚴'),
@@ -233,8 +308,6 @@ class CategoryModel {
         id: '9', name: 'Сулуулук', nameRu: 'Красота', icon: '💄', color: 'C77DFF',
         subcategories: [
           SubCategoryModel(id: '9_1', name: 'Баары',            nameRu: 'Все',              icon: '💄'),
-          SubCategoryModel(id: '9_2', name: 'Жүз карачу',       nameRu: 'Уход за лицом',   icon: '🧖'),
-          SubCategoryModel(id: '9_3', name: 'Чач карачу',       nameRu: 'Уход за волосами',icon: '💇'),
           SubCategoryModel(id: '9_4', name: 'Парфюм',           nameRu: 'Парфюм',          icon: '🌸'),
           SubCategoryModel(id: '9_5', name: 'Макияж',           nameRu: 'Макияж',          icon: '💋'),
           SubCategoryModel(id: '9_6', name: 'Тырмак',           nameRu: 'Ногти',           icon: '💅'),
@@ -265,9 +338,9 @@ class CategoryModel {
         id: '11', name: 'Автотовар', nameRu: 'Автотовары', icon: '🚗', color: '4895EF',
         subcategories: [
           SubCategoryModel(id: '11_1', name: 'Баары',            nameRu: 'Все',              icon: '🚗'),
-          SubCategoryModel(id: '11_2', name: 'Аксессуарлар',     nameRu: 'Аксессуары',       icon: '🪝'),
+          SubCategoryModel(id: '11_2', name: 'Аксессуарлар',     nameRu: 'Аксессуары',       icon: ''),
           SubCategoryModel(id: '11_3', name: 'Автохимия',        nameRu: 'Автохимия',        icon: '🧪'),
-          SubCategoryModel(id: '11_4', name: 'Дөңгөлөктөр',     nameRu: 'Шины/Диски',       icon: '🛞'),
+          SubCategoryModel(id: '11_4', name: 'Дөңгөлөктөр',     nameRu: 'Шины/Диски',       icon: ''),
           SubCategoryModel(id: '11_5', name: 'Запас бөлүктөр',  nameRu: 'Запчасти',         icon: '⚙️'),
           SubCategoryModel(id: '11_6', name: 'Видеорегистратор', nameRu: 'Видеорегистратор', icon: '📹'),
           SubCategoryModel(id: '11_7', name: 'Автоаудио',        nameRu: 'Автоаудио',        icon: '🔊'),

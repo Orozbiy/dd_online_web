@@ -1,17 +1,13 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:ui_web' as ui_web;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:video_player/video_player.dart';
+import 'package:cached_video_player_plus/cached_video_player_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/story_model.dart';
 import '../services/story_service.dart';
 import '../widgets/story_progress_bar.dart';
 import '../widgets/story_like_button.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 class StoryViewerScreen extends StatefulWidget {
   final List<StoryModel> stories;
@@ -20,6 +16,7 @@ class StoryViewerScreen extends StatefulWidget {
   const StoryViewerScreen({
     super.key,
     required this.stories,
+
     this.initialIndex = 0,
   });
 
@@ -32,24 +29,31 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   late List<StoryModel> _stories;
   late int _currentIndex;
 
-  // ── Прогресс ──
+  // ── Прогресс AnimationController (сүрөт үчүн 5 сек) ──
   late AnimationController _progressCtrl;
   late Animation<double> _progressAnim;
 
-  static const int _imageDuration        = 5;
-  static const int _fallbackVideoDuration = 15;
+  static const int _imageDuration = 5;
 
-  bool _isPaused     = false;
-  bool _isNavigating = false;
+  bool _isPaused = false;
 
-  // ── Mobile video player ──
-  VideoPlayerController? _videoCtrl;
+  // ── Video player ──
+  CachedVideoPlayerPlusController? _videoCtrl;
   bool _videoReady = false;
-  Timer? _durationTimer;
+  bool _isVideoStory = false;
+  
 
-  // ── Web HTML video ──
-  html.VideoElement? _webVideo;
-  String _webViewId = '';
+  // ── Сүрөт жүктөлдүбү ──
+  bool _imageReady = false;
+
+  // ── Видео прогрессти жаңыртуу таймер ──
+  Timer? _videoProgressTimer;
+
+  // ── Видео прогресс (0.0 → 1.0) ──
+  double _videoProgress = 0.0;
+
+  // ── Viewed IDs ──
+  Set<String> _viewedIds = {};
 
   @override
   void initState() {
@@ -59,213 +63,170 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _progressCtrl = AnimationController(vsync: this);
+    // AnimationController — сүрөт үчүн гана
+    _progressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: _imageDuration),
+    );
     _progressAnim = CurvedAnimation(
       parent: _progressCtrl,
       curve:  Curves.linear,
     );
 
-    _startStory(_currentIndex);
+    // БИР ЖОЛУ ГАНА баштайбыз
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadViewedIds();
+      if (mounted) _startStory(_currentIndex);
+    });
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _progressCtrl.dispose();
-    _durationTimer?.cancel();
+    _videoProgressTimer?.cancel();
     _disposeVideo();
-    _disposeWebVideo();
     super.dispose();
   }
 
   // ─────────────────────────────────────────────
-  // Dispose
+  // Viewed IDs
   // ─────────────────────────────────────────────
-  void _disposeVideo() {
-    _durationTimer?.cancel();
-    _durationTimer = null;
-    _videoCtrl?.removeListener(_onVideoListener);
-    _videoCtrl?.pause();
-    _videoCtrl?.dispose();
-    _videoCtrl  = null;
-    _videoReady = false;
+  Future<void> _loadViewedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('viewed_story_ids') ?? [];
+    _viewedIds = ids.toSet();
+    if (mounted) {
+      setState(() {
+        _stories = _stories
+            .map((s) => s.copyWith(isViewed: _viewedIds.contains(s.id)))
+            .toList();
+      });
+    }
   }
 
-  void _disposeWebVideo() {
-    _webVideo?.pause();
-    _webVideo?.src = '';
-    _webVideo = null;
+  Future<void> _markViewed(String storyId) async {
+    if (_viewedIds.contains(storyId)) return;
+    _viewedIds.add(storyId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('viewed_story_ids', _viewedIds.toList());
+    if (!mounted) return;
+    setState(() {
+      final i = _stories.indexWhere((s) => s.id == storyId);
+      if (i != -1) _stories[i] = _stories[i].copyWith(isViewed: true);
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Video dispose
+  // ─────────────────────────────────────────────
+  void _disposeVideo() {
+    _videoProgressTimer?.cancel();
+    _videoProgressTimer = null;
+    _videoCtrl?.pause();
+    _videoCtrl?.dispose();
+    _videoCtrl = null;
+    _videoReady = false;
+    _videoProgress = 0.0;
+    _isVideoStory = false;
   }
 
   // ─────────────────────────────────────────────
   // Story баштоо
   // ─────────────────────────────────────────────
   Future<void> _startStory(int index) async {
-    if (index < 0 || index >= _stories.length) return;
+    if (index >= _stories.length) {
+      _close();
+      return;
+    }
 
     _disposeVideo();
-    _disposeWebVideo();
+
+    // Прогрессти баштапкы абалга келтир
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
     _progressCtrl.reset();
 
     final story = _stories[index];
+    _markViewed(story.id);
 
     if (story.isVideo) {
-      if (kIsWeb) {
-        await _initWebVideo(story.mediaUrl);
-      } else {
-        await _initVideo(story.mediaUrl);
-      }
+      setState(() => _isVideoStory = true);
+      await _initVideo(story.mediaUrl);
     } else {
+      // ── СҮРӨТ: жүктөлгөндөн кийин 5 секунд ──
+      setState(() {
+        _isVideoStory = false;
+        _imageReady = false; // жүктөлүп жатат
+      });
       _progressCtrl.duration = const Duration(seconds: _imageDuration);
-      _progressCtrl.forward();
-      _progressCtrl.addStatusListener(_onProgressStatus);
+      // Таймер _onImageLoaded() чакырылганда башталат
     }
   }
 
   // ─────────────────────────────────────────────
-  // WEB: HTML <video> элементи
-  // ─────────────────────────────────────────────
-  Future<void> _initWebVideo(String url) async {
-    debugPrint('🎬 Web видео URL: $url');
-
-    final viewId = 'story-video-${DateTime.now().millisecondsSinceEpoch}';
-    _webViewId   = viewId;
-
-    final video = html.VideoElement()
-      ..src        = url
-      ..autoplay   = true
-      ..controls   = false
-      ..style.width  = '100%'
-      ..style.height = '100%'
-      ..style.objectFit = 'contain'
-      ..style.backgroundColor = 'black'
-      ..setAttribute('playsinline', 'true')
-      ..setAttribute('crossorigin', 'anonymous');
-
-    _webVideo = video;
-
-    // View катары каттоо
-    // ignore: undefined_prefixed_name
-    ui_web.platformViewRegistry.registerViewFactory(
-      viewId,
-      (_) => video,
-    );
-
-    // Видео жүктөлгөндө прогресс баштоо
-    video.onCanPlay.listen((_) {
-      if (!mounted) return;
-      debugPrint('✅ Web видео ready, duration: ${video.duration}s');
-      setState(() {});
-
-      final dur = video.duration;
-      if (dur > 0 && dur.isFinite) {
-        _startProgressForVideo(
-          Duration(milliseconds: (dur * 1000).toInt()),
-        );
-      } else {
-        _startProgressForVideo(
-          const Duration(seconds: _fallbackVideoDuration),
-        );
-      }
-    });
-
-    // Видео бүткөндө кийинкиге өтүү
-    video.onEnded.listen((_) {
-      if (!mounted) return;
-      _goNext();
-    });
-
-    // Ката
-    video.onError.listen((_) {
-      debugPrint('❌ Web видео ката: ${video.error?.message}');
-      if (!mounted) return;
-      _startProgressForVideo(
-        const Duration(seconds: _fallbackVideoDuration),
-      );
-    });
-
-    if (mounted) setState(() {});
-  }
-
-  // ─────────────────────────────────────────────
-  // MOBILE: video_player
+  // Видео инициализация
   // ─────────────────────────────────────────────
   Future<void> _initVideo(String url) async {
     try {
-      debugPrint('🎬 Mobile видео URL: $url');
-      final ctrl = VideoPlayerController.networkUrl(
+      final ctrl = CachedVideoPlayerPlusController.networkUrl(
         Uri.parse(url),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        httpHeaders: {'Cache-Control': 'max-age=604800'},
+        invalidateCacheIfOlderThan: const Duration(days: 2),
       );
       _videoCtrl = ctrl;
 
       await ctrl.initialize();
-      debugPrint('✅ Mobile видео initialize: ${ctrl.value.duration}');
       if (!mounted) return;
 
       setState(() => _videoReady = true);
-      ctrl.play();
-      _waitForDurationAndStartProgress(ctrl);
-      ctrl.addListener(_onVideoListener);
+      await ctrl.play();
+
+      // ── Таймер: видеонун позициясын окуп прогрессти жаңыртат ──
+      _videoProgressTimer = Timer.periodic(
+        const Duration(milliseconds: 50),
+        (_) {
+          if (!mounted) return;
+          final dur = ctrl.value.duration.inMilliseconds;
+          final pos = ctrl.value.position.inMilliseconds;
+          if (dur <= 0) return;
+
+          final progress = (pos / dur).clamp(0.0, 1.0);
+          setState(() => _videoProgress = progress);
+
+          // Видео бүткөндө (акыркы 200ms)
+          if (pos >= dur - 200 && !_isPaused) {
+            _videoProgressTimer?.cancel();
+            _videoProgressTimer = null;
+            _goNext();
+          }
+        },
+      );
     } catch (e) {
       debugPrint('❌ Video init error: $e');
       if (mounted) {
-        _progressCtrl.duration =
-            const Duration(seconds: _fallbackVideoDuration);
+        setState(() {
+          _videoReady = false;
+          _isVideoStory = false;
+        });
+        _progressCtrl.duration = const Duration(seconds: _imageDuration);
         _progressCtrl.forward();
         _progressCtrl.addStatusListener(_onProgressStatus);
       }
     }
   }
 
-  void _waitForDurationAndStartProgress(VideoPlayerController ctrl) {
-    final dur = ctrl.value.duration;
-    if (dur.inMilliseconds > 500) {
-      _startProgressForVideo(dur);
-      return;
-    }
-
-    int attempts = 0;
-    _durationTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
-      if (!mounted) { t.cancel(); return; }
-      attempts++;
-      final d = ctrl.value.duration;
-      if (d.inMilliseconds > 500) {
-        t.cancel();
-        _startProgressForVideo(d);
-      } else if (attempts > 100) {
-        t.cancel();
-        _startProgressForVideo(
-            const Duration(seconds: _fallbackVideoDuration));
-      }
-    });
-  }
-
-  void _startProgressForVideo(Duration duration) {
-    if (!mounted) return;
+  // ── Сүрөт толук жүктөлгөндө чакырылат ──
+  void _onImageLoaded() {
+    if (_imageReady || _isVideoStory) return; // эки жолу чакырылбасын
+    _imageReady = true;
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
     _progressCtrl.reset();
-    _progressCtrl.duration = duration;
     _progressCtrl.forward();
     _progressCtrl.addStatusListener(_onProgressStatus);
   }
 
-  void _onVideoListener() {
-    if (!mounted) return;
-    final ctrl = _videoCtrl;
-    if (ctrl == null) return;
-    final pos = ctrl.value.position;
-    final dur = ctrl.value.duration;
-    if (dur.inMilliseconds > 0 &&
-        pos.inMilliseconds >= dur.inMilliseconds - 200) {
-      _goNext();
-    }
-  }
-
+  // Сүрөт прогресс бүттү
   void _onProgressStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
       _progressCtrl.removeStatusListener(_onProgressStatus);
@@ -276,47 +237,78 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ─────────────────────────────────────────────
   // Навигация
   // ─────────────────────────────────────────────
+  bool _isNavigating = false;
+
   void _goNext() {
     if (_isNavigating) return;
     _isNavigating = true;
     _progressCtrl.removeStatusListener(_onProgressStatus);
 
     if (_currentIndex < _stories.length - 1) {
-      setState(() { _currentIndex++; _isNavigating = false; });
+      setState(() {
+        _currentIndex++;
+        _isNavigating = false;
+      });
       _startStory(_currentIndex);
     } else {
-      setState(() { _currentIndex = 0; _isNavigating = false; });
-      _startStory(0);
+      _isNavigating = false;
+      _close();
     }
   }
 
   void _goPrev() {
-    if (_isNavigating) return;
     _progressCtrl.removeStatusListener(_onProgressStatus);
-    if (_currentIndex > 0) setState(() => _currentIndex--);
-    _isNavigating = false;
+    if (_currentIndex > 0) {
+      setState(() => _currentIndex--);
+    } else {
+      _progressCtrl.reset();
+    }
     _startStory(_currentIndex);
   }
 
-  void _close() => Navigator.of(context).pop(_stories);
+  void _close() {
+    Navigator.of(context).pop(_stories);
+  }
 
   // ─────────────────────────────────────────────
   // Пауза / Resume
   // ─────────────────────────────────────────────
   void _pause() {
     if (_isPaused) return;
-    _durationTimer?.cancel();
-    _progressCtrl.stop();
-    _videoCtrl?.pause();
-    _webVideo?.pause();
+    if (_isVideoStory) {
+      _videoProgressTimer?.cancel();
+      _videoCtrl?.pause();
+    } else {
+      _progressCtrl.stop();
+    }
     setState(() => _isPaused = true);
   }
 
   void _resume() {
     if (!_isPaused) return;
-    _progressCtrl.forward();
-    _videoCtrl?.play();
-    _webVideo?.play();
+    if (_isVideoStory && _videoCtrl != null) {
+      _videoCtrl!.play();
+      // Таймерди кайра баштайбыз
+      final ctrl = _videoCtrl!;
+      _videoProgressTimer = Timer.periodic(
+        const Duration(milliseconds: 50),
+        (_) {
+          if (!mounted) return;
+          final dur = ctrl.value.duration.inMilliseconds;
+          final pos = ctrl.value.position.inMilliseconds;
+          if (dur <= 0) return;
+          final progress = (pos / dur).clamp(0.0, 1.0);
+          setState(() => _videoProgress = progress);
+          if (pos >= dur - 200 && !_isPaused) {
+            _videoProgressTimer?.cancel();
+            _videoProgressTimer = null;
+            _goNext();
+          }
+        },
+      );
+    } else {
+      _progressCtrl.forward();
+    }
     setState(() => _isPaused = false);
   }
 
@@ -360,8 +352,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // ── Медиа ──
             _buildMedia(story),
 
+            // ── Градиент жогору ──
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -372,6 +366,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
+            // ── Градиент төмөн ──
             const Positioned(
               bottom: 0, left: 0, right: 0,
               child: DecoratedBox(
@@ -386,17 +381,25 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
+            // ── Прогресс сызык + жабуу ──
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    StoryProgressBar(
-                      count:        _stories.length,
-                      currentIndex: _currentIndex,
-                      progress:     _progressAnim,
-                    ),
+                    // ✅ Видео болсо — видеонун позициясы, сүрөт болсо — AnimationController
+                    _isVideoStory
+                        ? _VideoProgressBar(
+                            count:        _stories.length,
+                            currentIndex: _currentIndex,
+                            progress:     _videoProgress,
+                          )
+                        : StoryProgressBar(
+                            count:        _stories.length,
+                            currentIndex: _currentIndex,
+                            progress:     _progressAnim,
+                          ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -426,6 +429,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
+            // ── Лайк баскычы ──
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: SafeArea(
@@ -454,7 +458,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // Медиа виджет
   // ─────────────────────────────────────────────
   Widget _buildMedia(StoryModel story) {
-    // ── СҮРӨТ ──
     if (story.isImage) {
       return CachedNetworkImage(
         key:      ValueKey(story.id),
@@ -462,62 +465,96 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         fit:      BoxFit.cover,
         width:    double.infinity,
         height:   double.infinity,
+        // ✅ Сүрөт жүктөлгөндөн кийин таймер башталат
+        imageBuilder: (_, imageProvider) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
+          return Image(
+            image: imageProvider,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          );
+        },
         placeholder: (_, __) => const Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
-        errorWidget: (_, __, ___) => const Center(
-          child: Icon(Icons.image_not_supported_outlined,
-              color: Colors.white54, size: 64),
+        errorWidget: (_, __, ___) {
+          // Ката болсо да таймерди башта
+          WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
+          return const Center(
+            child: Icon(Icons.image_not_supported_outlined,
+                color: Colors.white54, size: 64),
+          );
+        },
+      );
+    }
+
+    if (_videoReady && _videoCtrl != null && _videoCtrl!.value.isInitialized) {
+      return SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width:  _videoCtrl!.value.size.width,
+            height: _videoCtrl!.value.size.height,
+            child:  CachedVideoPlayerPlus(_videoCtrl!),
+          ),
         ),
       );
     }
 
-    // ── WEB ВИДЕО ──
-    if (kIsWeb) {
-      if (_webViewId.isEmpty) {
-        return const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Colors.white),
-              SizedBox(height: 12),
-              Text('Видео жүктөлүп жатат...',
-                  style: TextStyle(color: Colors.white70, fontSize: 13)),
-            ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: Colors.white),
+          SizedBox(height: 12),
+          Text('Видео жүктөлүп жатат...',
+              style: TextStyle(color: Colors.white70, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Видео прогресс сызыгы — double progress (0.0→1.0) кабыл алат
+// ─────────────────────────────────────────────
+class _VideoProgressBar extends StatelessWidget {
+  final int count;
+  final int currentIndex;
+  final double progress; // 0.0 → 1.0, видеонун позициясынан
+
+  const _VideoProgressBar({
+    required this.count,
+    required this.currentIndex,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(count, (i) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < count - 1 ? 4 : 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 3,
+                child: LinearProgressIndicator(
+                  value: i < currentIndex
+                      ? 1.0
+                      : i == currentIndex
+                          ? progress
+                          : 0.0,
+                  backgroundColor: Colors.white.withValues(alpha: 0.4),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
           ),
         );
-      }
-      return Container(
-        color: Colors.black,
-        child: HtmlElementView(viewType: _webViewId),
-      );
-    }
-
-    // ── MOBILE ВИДЕО жүктөлүп жатат ──
-    if (!_videoReady || _videoCtrl == null ||
-        !_videoCtrl!.value.isInitialized) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 12),
-            Text('Видео жүктөлүп жатат...',
-                style: TextStyle(color: Colors.white70, fontSize: 13)),
-          ],
-        ),
-      );
-    }
-
-    // ── MOBILE ВИДЕО ──
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: _videoCtrl!.value.aspectRatio,
-          child: VideoPlayer(_videoCtrl!),
-        ),
-      ),
+      }),
     );
   }
 }

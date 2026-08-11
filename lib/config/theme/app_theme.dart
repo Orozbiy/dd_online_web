@@ -45,10 +45,10 @@ class AppTheme {
         fillColor: fillColor,
         contentPadding: _inputPadding,
         border: OutlineInputBorder(borderRadius: _borderRadius, borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: _borderRadius, borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
+        enabledBorder: const OutlineInputBorder(borderRadius: _borderRadius, borderSide: BorderSide.none),
+        focusedBorder: const OutlineInputBorder(
           borderRadius: _borderRadius,
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
         hintStyle: AppTextStyles.bodyMedium,
         prefixIconColor: AppColors.grey400,

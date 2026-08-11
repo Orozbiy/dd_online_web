@@ -1,5 +1,3 @@
-// lib/features/stories/models/story_model.dart
-
 class StoryModel {
   final String id;
   final String mediaUrl;
@@ -8,7 +6,7 @@ class StoryModel {
   final bool isActive;
   final DateTime createdAt;
   final bool isLikedByMe;
-  final bool isViewed;
+  final bool isViewed; // ← ЖАҢЫ
 
   const StoryModel({
     required this.id,
@@ -18,7 +16,7 @@ class StoryModel {
     required this.isActive,
     required this.createdAt,
     this.isLikedByMe = false,
-    this.isViewed = false,
+    this.isViewed = false, // ← ЖАҢЫ
   });
 
   factory StoryModel.fromMap(Map<String, dynamic> map) {
@@ -48,7 +46,7 @@ class StoryModel {
     bool?     isActive,
     DateTime? createdAt,
     bool?     isLikedByMe,
-    bool?     isViewed,
+    bool?     isViewed, // ← ЖАҢЫ
   }) {
     return StoryModel(
       id:          id          ?? this.id,
@@ -58,7 +56,7 @@ class StoryModel {
       isActive:    isActive    ?? this.isActive,
       createdAt:   createdAt   ?? this.createdAt,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
-      isViewed:    isViewed    ?? this.isViewed,
+      isViewed:    isViewed    ?? this.isViewed, // ← ЖАҢЫ
     );
   }
 

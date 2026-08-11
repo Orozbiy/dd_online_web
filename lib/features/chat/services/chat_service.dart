@@ -3,17 +3,11 @@ import '../../../core/supabase_client.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 
-/// Optimized ChatService
-/// - Batch запростор (N чат = 4 запрос, эмес 4N)
-/// - Параллел Future.wait()
-/// - Сессия кэши (кайра жүктөбөйт)
-/// - Buyer Google атын туура алат
 class ChatService {
-  // ── Сессия кэши ────────────────────────────────────────
   final Map<String, Map<String, dynamic>> _productCache = {};
-  final Map<String, String>  _storeCache  = {}; // owner_id → store_name
-  final Map<String, String?> _nameCache   = {}; // user_id  → full_name
-  final Map<String, String?> _avatarCache = {}; // user_id  → avatar_url
+  final Map<String, String>  _storeCache  = {};
+  final Map<String, String?> _nameCache   = {};
+  final Map<String, String?> _avatarCache = {};
 
   // ════════════════════════════════════════════════════
   // ЧАТ ТАБУУ / ТҮЗҮҮ
@@ -52,17 +46,22 @@ class ChatService {
   // БИЛДИРҮҮ ЖӨНӨТҮҮ
   // ════════════════════════════════════════════════════
 
-  Future<void> sendMessage({
-    required String chatId,
-    required String senderId,
-    String? text,
-    String? imageUrl,
-    String? audioUrl,
-    int?    audioDuration,
-    String? replyToId,
-    String? replyToText,
-  }) async {
-    await supabase.from('messages').insert({
+ Future<void> sendMessage({
+  required String chatId,
+  required String senderId,
+  String? text,
+  String? imageUrl,
+  String? audioUrl,
+  int?    audioDuration,
+  String? replyToId,
+  String? replyToText,
+  required bool senderIsBuyer,
+}) async {
+  final messageText = text ?? (imageUrl != null ? '🖼️ Сүрөт' : '🎵 Үн');
+  final unreadCol   = senderIsBuyer ? 'seller_unread' : 'buyer_unread';
+
+  await Future.wait([
+    supabase.from('messages').insert({
       'chat_id':        chatId,
       'sender_id':      senderId,
       'text':           text,
@@ -72,8 +71,17 @@ class ChatService {
       'is_read':        false,
       if (replyToId   != null) 'reply_to_id':   replyToId,
       if (replyToText != null) 'reply_to_text': replyToText,
-    });
-  }
+    }),
+    supabase.from('chats').update({
+      'last_message':    messageText,
+      'last_message_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', chatId),
+    supabase.rpc('increment_chat_unread', params: {
+      'p_chat_id': chatId,
+      'p_column':  unreadCol,
+    }),
+  ]);
+}
 
   // ════════════════════════════════════════════════════
   // ОКУЛДУ ДЕГЕН БЕЛГИЛӨӨ
@@ -122,6 +130,26 @@ class ChatService {
   Future<void> deleteMessages(List<String> messageIds) async {
     if (messageIds.isEmpty) return;
     await supabase.from('messages').delete().inFilter('id', messageIds);
+  }
+
+  // ════════════════════════════════════════════════════
+  // БИЛДИРҮҮНҮ ӨЗГӨРТҮҮ ✅ ЖАЙ
+  // ════════════════════════════════════════════════════
+
+  Future<void> editMessage({
+    required String messageId,
+    required String newText,
+  }) async {
+    try {
+      await supabase.from('messages').update({
+        'text':      newText,
+        'is_edited': true,
+        'edited_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', messageId);
+    } catch (e) {
+      debugPrint('❌ editMessage ката: $e');
+      rethrow;
+    }
   }
 
   // ════════════════════════════════════════════════════
@@ -175,19 +203,16 @@ class ChatService {
   }) async {
     if (rows.isEmpty) return [];
 
-    // ── 1. Кэште жок же null болгон ID'лерди чогулт ──
     final missingProductIds = <String>{};
     final missingSellerIds  = <String>{};
     final missingUserIds    = <String>{};
 
     for (final row in rows) {
-      // Продукт
       final pid = row['product_id'] as String?;
       if (pid != null && !_productCache.containsKey(pid)) {
         missingProductIds.add(pid);
       }
 
-      // Дүкөн аты
       final sid = row['seller_id'] as String? ?? '';
       if ((row['seller_name'] as String? ?? '').isEmpty &&
           !_storeCache.containsKey(sid)) {
@@ -197,9 +222,6 @@ class ChatService {
       final buyId = row['buyer_id']  as String? ?? '';
       final selId = row['seller_id'] as String? ?? '';
 
-      // ✅ ОҢДОО: null болсо да кайра суранат
-      // Мурда: containsKey(buyId) → null болсо да өтпөй калчу
-      // Азыр: мааниси null же жок болсо — кайра запрос жасайт
       final buyerNameMissing   = !_nameCache.containsKey(buyId)   || _nameCache[buyId] == null;
       final buyerAvatarMissing = !_avatarCache.containsKey(buyId) || _avatarCache[buyId] == null;
       final sellerAvatarMissing= !_avatarCache.containsKey(selId) || _avatarCache[selId] == null;
@@ -208,10 +230,7 @@ class ChatService {
       if (sellerAvatarMissing) missingUserIds.add(selId);
     }
 
-    // ── 2. Параллел batch запростор ───────────────────
     await Future.wait([
-
-      // Продукттар
       if (missingProductIds.isNotEmpty)
         supabase
             .from('products')
@@ -225,7 +244,6 @@ class ChatService {
               debugPrint('❌ products batch ката: $e');
             }),
 
-      // Дүкөн аттары
       if (missingSellerIds.isNotEmpty)
         supabase
             .from('stores')
@@ -243,25 +261,19 @@ class ChatService {
               debugPrint('❌ stores batch ката: $e');
             }),
 
-      // ✅ ОҢДОО: profiles'тен buyer аты + аватары алынат
-      // null болгон жазуулар да кайра суралат
       if (missingUserIds.isNotEmpty)
         supabase
             .from('profiles')
             .select('id, full_name, avatar_url')
             .inFilter('id', missingUserIds.toList())
             .then((list) {
-              debugPrint('👤 profiles жүктөлдү: ${list.length} колдонуучу');
               for (final p in list) {
                 final uid    = p['id']         as String;
                 final name   = p['full_name']  as String?;
                 final avatar = p['avatar_url'] as String?;
                 _nameCache[uid]   = name;
                 _avatarCache[uid] = avatar;
-                debugPrint('  → $uid: name=$name, avatar=${avatar != null ? "бар" : "жок"}');
               }
-              // Базада таптакыр жок болсо гана null деп белгиле
-              // (жогоруда мааниси bar болсо эч качан жазылбайт)
               for (final uid in missingUserIds) {
                 if (!_nameCache.containsKey(uid))   _nameCache[uid]   = null;
                 if (!_avatarCache.containsKey(uid)) _avatarCache[uid] = null;
@@ -271,36 +283,28 @@ class ChatService {
             }),
     ]);
 
-    // ── 3. Кэштен ChatModel түзүү ─────────────────────
     final result = <ChatModel>[];
 
     for (final row in rows) {
       final enriched = Map<String, dynamic>.from(row);
 
-      // Продукт
       final pid = row['product_id'] as String?;
       if (pid != null && _productCache.containsKey(pid)) {
         enriched['products'] = _productCache[pid];
       }
 
-      // Дүкөн аты
       final sid = row['seller_id'] as String? ?? '';
       if ((row['seller_name'] as String? ?? '').isEmpty &&
           _storeCache.containsKey(sid)) {
         enriched['seller_name'] = _storeCache[sid];
       }
 
-      // ✅ Buyer Google аты — null болбосо гана жазат
       final buyId = row['buyer_id'] as String? ?? '';
       final buyerName = _nameCache[buyId];
       if (buyerName != null && buyerName.isNotEmpty) {
         enriched['buyer_name'] = buyerName;
-        debugPrint('✅ buyer_name коюлду: $buyerName (buyId=$buyId)');
-      } else {
-        debugPrint('⚠️ buyer_name жок: buyId=$buyId, cache=${_nameCache[buyId]}');
       }
 
-      // Аватарлар
       final selId = row['seller_id'] as String? ?? '';
       final buyerAvatar  = _avatarCache[buyId];
       final sellerAvatar = _avatarCache[selId];
@@ -314,7 +318,7 @@ class ChatService {
   }
 
   // ════════════════════════════════════════════════════
-  // КЭШТИ ТАЗАЛОО  (logout болгондо чакыр)
+  // КЭШТИ ТАЗАЛОО
   // ════════════════════════════════════════════════════
 
   void clearCache() {

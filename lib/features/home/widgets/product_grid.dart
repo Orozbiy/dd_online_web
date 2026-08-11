@@ -6,7 +6,11 @@ class ProductGrid extends StatelessWidget {
   final List<ProductModel> products;
   final Function(ProductModel) onProductTap;
 
-  const ProductGrid({super.key, required this.products, required this.onProductTap});
+  const ProductGrid({
+    super.key,
+    required this.products,
+    required this.onProductTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,10 +19,13 @@ class ProductGrid extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey[300]),
+            Icon(Icons.shopping_bag_outlined,
+                size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            Text('Товарлар табылган жок',
-                style: Theme.of(context).textTheme.bodyLarge),
+            Text(
+              'Товарлар табылган жок',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
           ],
         ),
       );
@@ -37,94 +44,34 @@ class ProductGrid extends StatelessWidget {
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(14),
-      cacheExtent: 1200,
+      // ── Айнек стили үчүн padding: карточкалар тегерек бурчтары
+      //    кесилбесин деп четтерден бираз алыс болсун
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+      cacheExtent: MediaQuery.of(context).size.height * 2,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        // ✅ 0.65 — сыналган туруктуу маани
-        // Карточка бийиктиги = тuurasy / 0.65
-        // Сүрөт + маалымат бөлүмү ыңгайлуу сыят
-        childAspectRatio: 0.65,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        // ── Айнек карточкалар бираз узунураак — текст + баа үчүн орун
+        childAspectRatio: 0.62,
+        // ── Айнек shadow кесилбесин деп боштук кеңейтилди
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
-        return _AnimatedProductCard(
-          key: ValueKey(products[index].id),
-          index: index,
-          product: products[index],
-          onTap: () => onProductTap(products[index]),
+        final product = products[index];
+        return RepaintBoundary(
+          key: ValueKey(product.id),
+          // ── Айнек карточканын shadow'су кесилбесин деп
+          //    ар бир элементти Padding менен ороп коёбуз
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: ProductCard(
+              product: product,
+              onTap: () => onProductTap(product),
+            ),
+          ),
         );
       },
-    );
-  }
-}
-
-class _AnimatedProductCard extends StatefulWidget {
-  final int index;
-  final ProductModel product;
-  final VoidCallback onTap;
-
-  const _AnimatedProductCard({
-    super.key,
-    required this.index,
-    required this.product,
-    required this.onTap,
-  });
-
-  @override
-  State<_AnimatedProductCard> createState() => _AnimatedProductCardState();
-}
-
-class _AnimatedProductCardState extends State<_AnimatedProductCard>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
-  late Animation<Offset> _slide;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    final delayMs = (widget.index * 30).clamp(0, 200);
-    Future.delayed(Duration(milliseconds: delayMs), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return FadeTransition(
-      opacity: _opacity,
-      child: SlideTransition(
-        position: _slide,
-        child: ProductCard(
-          product: widget.product,
-          onTap: widget.onTap,
-        ),
-      ),
     );
   }
 }

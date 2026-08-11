@@ -109,6 +109,171 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
+  // ══════════════════════════════════════════════════════
+// НОМЕР ӨЗГӨРТҮҮ ӨТҮНҮЧҮ
+// ══════════════════════════════════════════════════════
+void _showChangePhoneSheet() {
+  final loc     = AppLocalizations.of(context);
+  final isDark  = Theme.of(context).brightness == Brightness.dark;
+  final ctrl    = TextEditingController();
+  bool sending  = false;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setS) => Container(
+        padding: EdgeInsets.only(
+          left: 20, right: 20, top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Баш ──
+            Row(children: [
+              const Text('📞', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(loc.get('dash_change_phone'),
+                    style: AppTextStyles.headingSmall.copyWith(
+                        color: isDark ? Colors.white : AppColors.black)),
+                Text(loc.get('dash_change_phone_sub'),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500)),
+              ])),
+            ]),
+            const SizedBox(height: 20),
+
+            // ── Учурдагы номер ──
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                const Icon(Icons.phone, size: 16, color: AppColors.grey500),
+                const SizedBox(width: 8),
+                Text(
+                  loc.locale.languageCode == 'ru'
+                      ? 'Текущий номер: ${_seller?.phone ?? ''}'
+                      : 'Учурдагы номер: ${_seller?.phone ?? ''}',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                      color: isDark ? Colors.white70 : AppColors.grey600),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Жаңы номер ──
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.phone,
+              style: AppTextStyles.bodyMedium.copyWith(
+                  color: isDark ? Colors.white : AppColors.black),
+              decoration: InputDecoration(
+                labelText: loc.locale.languageCode == 'ru'
+                    ? 'Новый номер телефона'
+                    : 'Жаңы телефон номери',
+                hintText: '+996 700 123 456',
+                prefixIcon: const Icon(Icons.phone_android, color: AppColors.primary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Маалымат ──
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  loc.locale.languageCode == 'ru'
+                      ? 'Запрос будет отправлен администратору. Номер изменится после подтверждения.'
+                      : 'Өтүнүч администраторго жиберилет. Номер бекитилгенден кийин өзгөрөт.',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Жиберүү баскычы ──
+            SizedBox(
+              width: double.infinity, height: 50,
+              child: ElevatedButton(
+                onPressed: sending
+                    ? null
+                    : () async {
+                        final newPhone = ctrl.text.trim();
+                        if (newPhone.length < 9) {
+                          _showSnack(loc.get('reg_err_phone'), AppColors.error);
+                          return;
+                        }
+                        setS(() => sending = true);
+                        try {
+                          // Supabase га өтүнүч жаз
+                          await supabase.from('phone_change_requests').insert({
+                            'seller_uid':   _seller!.uid,
+                            'seller_name':  _seller!.name,
+                            'shop_name':    _seller!.shopName,
+                            'old_phone':    _seller!.phone,
+                            'new_phone':    newPhone,
+                            'status':       'pending',
+                            'created_at':   DateTime.now().toIso8601String(),
+                          });
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          _showSnack(
+                            loc.locale.languageCode == 'ru'
+                                ? '✅ Запрос отправлен администратору!'
+                                : '✅ Өтүнүч администраторго жиберилди!',
+                            AppColors.success,
+                          );
+                        } catch (e) {
+                          setS(() => sending = false);
+                          _showSnack(loc.get('error'), AppColors.error);
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.grey200,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: sending
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : Text(
+                        loc.locale.languageCode == 'ru' ? 'Отправить запрос' : 'Өтүнүч жиберүү',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
   void _goBack() {
     Navigator.pushAndRemoveUntil(context,
         MaterialPageRoute(builder: (_) => const HomeScreen()), (route) => false);
@@ -503,10 +668,9 @@ const SizedBox(height: 20),
                     builder: (_) => SellerProductScreen(sellerUid: _seller!.uid, shopName: _seller!.shopName)))),
               const SizedBox(height: 10),
 
-              _buildMenuItem(context,
-                icon: '📊', title: loc.get('dash_stats'), subtitle: loc.get('dash_stats_sub'),
-                onTap: () => _showSnack(loc.get('coming_soon'))),
-              const SizedBox(height: 10),
+             _buildMenuItem(context,
+  icon: '📊', title: loc.get('dash_stats'), subtitle: loc.get('dash_stats_sub'),
+  onTap: () => _showSnack(loc.get('coming_soon'))),
 
               _buildMenuItem(context,
                 icon: '📍', title: loc.get('dash_location'), subtitle: loc.get('dash_location_sub'),
@@ -540,13 +704,13 @@ const SizedBox(height: 20),
               _buildChatMenuItem(loc, cardBg),
               const SizedBox(height: 10),
 
-              _buildMenuItem(context,
-                icon: '📞', title: loc.get('dash_change_phone'), subtitle: loc.get('dash_change_phone_sub'),
-                onTap: () => _showSnack(loc.get('coming_soon'))),
+             _buildMenuItem(context,
+  icon: '📞', title: loc.get('dash_change_phone'), subtitle: loc.get('dash_change_phone_sub'),
+  onTap: () => _showChangePhoneSheet()),
               const SizedBox(height: 10),
 
-              _buildSubscriptionButton(loc, isDark),
-              const SizedBox(height: 24),
+              // _buildSubscriptionButton(loc, isDark),
+              // const SizedBox(height: 24),
 
               // ── Байланыш блогу ──
               Container(
@@ -593,64 +757,64 @@ const SizedBox(height: 20),
     );
   }
 
-  Widget _buildSubscriptionButton(AppLocalizations loc, bool isDark) {
-    final hasCard = _seller?.hasCard ?? false;
-    final autoOn  = _seller?.autoPayEnabled ?? false;
-    final paid    = _seller?.currentMonthPaid ?? false;
+  // Widget _buildSubscriptionButton(AppLocalizations loc, bool isDark) {
+  //   final hasCard = _seller?.hasCard ?? false;
+  //   final autoOn  = _seller?.autoPayEnabled ?? false;
+  //   final paid    = _seller?.currentMonthPaid ?? false;
 
-    Color borderColor;
-    Color bgColor;
-    String statusText;
-    String subtitleText;
+  //   Color borderColor;
+  //   Color bgColor;
+  //   String statusText;
+  //   String subtitleText;
 
-    if (autoOn && paid) {
-      borderColor  = AppColors.success;
-      bgColor      = isDark ? const Color(0xFF0D2B1A) : const Color(0xFFEEFFF5);
-      statusText   = loc.get('sub_status_paid');
-      subtitleText = '${_seller?.cardMasked ?? ''} · ${loc.get('sub_per_month')}';
-    } else if (autoOn && !paid) {
-      borderColor  = AppColors.primary;
-      bgColor      = isDark ? const Color(0xFF2B1E0A) : const Color(0xFFFFF8F0);
-      statusText   = loc.get('sub_status_active');
-      subtitleText = '${_seller?.cardMasked ?? ''} · ${loc.get('sub_charge_day')}';
-    } else if (hasCard && !autoOn) {
-      borderColor  = AppColors.grey400;
-      bgColor      = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-      statusText   = loc.get('sub_status_paused');
-      subtitleText = _seller?.cardMasked ?? '';
-    } else {
-      borderColor  = AppColors.error.withValues(alpha: 0.5);
-      bgColor      = isDark ? const Color(0xFF2B0D0D) : const Color(0xFFFFF1F0);
-      statusText   = loc.get('sub_status_none');
-      subtitleText = loc.get('sub_link_hint');
-    }
+  //   if (autoOn && paid) {
+  //     borderColor  = AppColors.success;
+  //     bgColor      = isDark ? const Color(0xFF0D2B1A) : const Color(0xFFEEFFF5);
+  //     statusText   = loc.get('sub_status_paid');
+  //     subtitleText = '${_seller?.cardMasked ?? ''} · ${loc.get('sub_per_month')}';
+  //   } else if (autoOn && !paid) {
+  //     borderColor  = AppColors.primary;
+  //     bgColor      = isDark ? const Color(0xFF2B1E0A) : const Color(0xFFFFF8F0);
+  //     statusText   = loc.get('sub_status_active');
+  //     subtitleText = '${_seller?.cardMasked ?? ''} · ${loc.get('sub_charge_day')}';
+  //   } else if (hasCard && !autoOn) {
+  //     borderColor  = AppColors.grey400;
+  //     bgColor      = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+  //     statusText   = loc.get('sub_status_paused');
+  //     subtitleText = _seller?.cardMasked ?? '';
+  //   } else {
+  //     borderColor  = AppColors.error.withValues(alpha: 0.5);
+  //     bgColor      = isDark ? const Color(0xFF2B0D0D) : const Color(0xFFFFF1F0);
+  //     statusText   = loc.get('sub_status_none');
+  //     subtitleText = loc.get('sub_link_hint');
+  //   }
 
-    return GestureDetector(
-      onTap: _showSubscriptionSheet,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor.withValues(alpha: 0.5)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        child: Row(children: [
-          const Text('💳', style: TextStyle(fontSize: 26)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(statusText,
-                style: AppTextStyles.labelLarge.copyWith(
-                  color: isDark ? Colors.white : AppColors.black,
-                )),
-            const SizedBox(height: 2),
-            Text(subtitleText, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500)),
-          ])),
-          const Icon(Icons.arrow_forward_ios, color: AppColors.grey400, size: 16),
-        ]),
-      ),
-    );
-  }
+  //   return GestureDetector(
+  //     onTap: _showSubscriptionSheet,
+  //     child: Container(
+  //       padding: const EdgeInsets.all(16),
+  //       decoration: BoxDecoration(
+  //         color: bgColor,
+  //         borderRadius: BorderRadius.circular(14),
+  //         border: Border.all(color: borderColor.withValues(alpha: 0.5)),
+  //         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+  //       ),
+  //       child: Row(children: [
+  //         const Text('💳', style: TextStyle(fontSize: 26)),
+  //         const SizedBox(width: 12),
+  //         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  //           Text(statusText,
+  //               style: AppTextStyles.labelLarge.copyWith(
+  //                 color: isDark ? Colors.white : AppColors.black,
+  //               )),
+  //           const SizedBox(height: 2),
+  //           Text(subtitleText, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500)),
+  //         ])),
+  //         const Icon(Icons.arrow_forward_ios, color: AppColors.grey400, size: 16),
+  //       ]),
+  //     ),
+  //   );
+  // }
 
   Widget _buildChatMenuItem(AppLocalizations loc, Color cardBg) {
     return StreamBuilder<List>(

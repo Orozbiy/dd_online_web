@@ -55,7 +55,6 @@ class _CategoryListState extends State<CategoryList> {
   void _onCategoryTap(CategoryModel cat) {
     setState(() {
       if (_selectedCategoryId == cat.id) {
-        // Эгер эле тандалган болсо — баарын тазала
         _selectedCategoryId = null;
         _selectedSubId = null;
         _selectedSubSubId = null;
@@ -74,14 +73,12 @@ class _CategoryListState extends State<CategoryList> {
   void _onSubCategoryTap(SubCategoryModel sub) {
     setState(() {
       if (_selectedSubId == sub.id) {
-        // Эгер эле тандалган болсо — sub тазала, негизги категория калсын
         _selectedSubId = null;
         _selectedSubSubId = null;
         widget.onCategorySelected(_selectedCategoryId ?? '');
       } else {
         _selectedSubId = sub.id;
         _selectedSubSubId = null;
-        // "Баары" болсо — негизги категория ID жибер
         if (sub.id.endsWith('_1')) {
           widget.onCategorySelected(_selectedCategoryId ?? '');
         } else {
@@ -136,187 +133,102 @@ class _CategoryListState extends State<CategoryList> {
     final sub    = _selectedSub;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inactiveBg   = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
-    final inactiveIcon = isDark ? AppColors.grey400 : AppColors.grey600;
+    final inactiveColor = isDark ? AppColors.grey400 : AppColors.grey600;
+
+    // Категория тандалганда анын түсүн алабыз, болбосо primary
+    final activeCatColor = cat != null
+        ? Color(int.parse('0xFF${cat.color}'))
+        : AppColors.primary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── 1-ДЕҢГЭЭЛ: Негизги категория + Filter баскычтары ──
+        // ══════════════════════════════════════════
+        // 1-ДЕҢГЭЭЛ: Негизги категория + Filter pills
+        // ══════════════════════════════════════════
         SizedBox(
-          height: 52,
-          child: SingleChildScrollView(
+          height: 44,
+          child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Категория баскычы
-                GestureDetector(
-                  onTap: _openCategorySheet,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _selectedCategoryId != null
-                          ? AppColors.primary
-                          : inactiveBg,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: _selectedCategoryId != null
-                          ? [BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            )]
-                          : [],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.grid_view_rounded,
-                          size: 17,
-                          color: _selectedCategoryId != null
-                              ? Colors.white
-                              : inactiveIcon,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _selectedCategoryId != null
-                              ? (cat?.localizedName(loc.locale.languageCode) ??
-                                  loc.get('cat_label'))
-                              : loc.get('cat_label'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: _selectedCategoryId != null
-                                ? Colors.white
-                                : inactiveIcon,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (_selectedCategoryId != null) ...[
-                          const SizedBox(width: 4),
-                          Icon(Icons.close_rounded,
-                              size: 15,
-                              color: Colors.white.withValues(alpha: 0.8)),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
+            children: [
+              // ── Категория pill ──
+              _PillButton(
+                icon: Icons.grid_view_rounded,
+                emoji: cat?.icon,
+                label: _selectedCategoryId != null
+                    ? (cat?.localizedName(loc.locale.languageCode) ??
+                        loc.get('cat_label'))
+                    : loc.get('cat_label'),
+                isActive: _selectedCategoryId != null,
+                activeColor: activeCatColor,
+                inactiveBg: inactiveBg,
+                inactiveColor: inactiveColor,
+                showClose: _selectedCategoryId != null,
+                onTap: _openCategorySheet,
+              ),
+              const SizedBox(width: 8),
 
-                // Жаңы
-                GestureDetector(
-                  onTap: () => _setFilterMode(ProductFilterMode.newest),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _filterMode == ProductFilterMode.newest
-                          ? AppColors.primary
-                          : inactiveBg,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: _filterMode == ProductFilterMode.newest
-                          ? [BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            )]
-                          : [],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.fiber_new_rounded,
-                            size: 17,
-                            color: _filterMode == ProductFilterMode.newest
-                                ? Colors.white
-                                : inactiveIcon),
-                        const SizedBox(width: 5),
-                        Text(
-                          loc.get('cat_newest'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: _filterMode == ProductFilterMode.newest
-                                ? Colors.white
-                                : inactiveIcon,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // ── Жаңы pill ──
+              _PillButton(
+                icon: Icons.fiber_new_rounded,
+                label: loc.get('cat_newest'),
+                isActive: _filterMode == ProductFilterMode.newest,
+                activeColor: AppColors.primary,
+                inactiveBg: inactiveBg,
+                inactiveColor: inactiveColor,
+                onTap: () => _setFilterMode(ProductFilterMode.newest),
+              ),
+              const SizedBox(width: 8),
 
-                // Таанымал
-                GestureDetector(
-                  onTap: () => _setFilterMode(ProductFilterMode.popular),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _filterMode == ProductFilterMode.popular
-                          ? const Color(0xFFD97706)
-                          : inactiveBg,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: _filterMode == ProductFilterMode.popular
-                          ? [BoxShadow(
-                              color: const Color(0xFFD97706).withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            )]
-                          : [],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.trending_up_rounded,
-                            size: 16,
-                            color: _filterMode == ProductFilterMode.popular
-                                ? Colors.white
-                                : inactiveIcon),
-                        const SizedBox(width: 5),
-                        Text(
-                          loc.get('cat_popular'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: _filterMode == ProductFilterMode.popular
-                                ? Colors.white
-                                : inactiveIcon,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              // ── Таанымал pill ──
+              _PillButton(
+                icon: Icons.trending_up_rounded,
+                label: loc.get('cat_popular'),
+                isActive: _filterMode == ProductFilterMode.popular,
+                activeColor: const Color(0xFFD97706),
+                inactiveBg: inactiveBg,
+                inactiveColor: inactiveColor,
+                onTap: () => _setFilterMode(ProductFilterMode.popular),
+              ),
+            ],
           ),
         ),
 
-        // ── 2-ДЕҢГЭЭЛ: Subcategory тилкеси ──
+        // ══════════════════════════════════════════
+        // 2-ДЕҢГЭЭЛ: SubCategory тилкеси
+        // ══════════════════════════════════════════
         AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
           child: cat != null && cat.subcategories.isNotEmpty
-              ? _SubCategoryBar(
-                  category: cat,
-                  selectedSubId: _selectedSubId,
-                  onSubTap: _onSubCategoryTap,
+              ? _PillRow(
+                  items: cat.subcategories,
+                  selectedId: _selectedSubId ?? '${cat.id}_1',
+                  activeColor: activeCatColor,
+                  isDark: isDark,
+                  topMargin: 8,
+                  onTap: _onSubCategoryTap,
                 )
               : const SizedBox.shrink(),
         ),
 
-        // ── 3-ДЕҢГЭЭЛ: SubSubCategory тилкеси (subItems болгондо гана) ──
+        // ══════════════════════════════════════════
+        // 3-ДЕҢГЭЭЛ: SubSubCategory тилкеси
+        // ══════════════════════════════════════════
         AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
           child: sub != null && sub.hasSubItems
-              ? _SubSubCategoryBar(
-                  parentSub: sub,
-                  categoryColor: Color(int.parse('0xFF${cat!.color}')),
-                  selectedSubSubId: _selectedSubSubId,
-                  onSubSubTap: _onSubSubCategoryTap,
+              ? _PillRow(
+                  items: sub.subItems,
+                  selectedId: _selectedSubSubId ?? '',
+                  activeColor: activeCatColor,
+                  isDark: isDark,
+                  topMargin: 4,
+                  isSubSub: true,
+                  onTap: _onSubSubCategoryTap,
                 )
               : const SizedBox.shrink(),
         ),
@@ -326,201 +238,195 @@ class _CategoryListState extends State<CategoryList> {
 }
 
 // ══════════════════════════════════════════════════════════
-// 2-ДЕҢГЭЭЛ — SubCategory тилкеси
+// Бирдей стилдеги Pill баскычы (1-деңгээл үчүн)
 // ══════════════════════════════════════════════════════════
-class _SubCategoryBar extends StatelessWidget {
-  final CategoryModel category;
-  final String? selectedSubId;
-  final Function(SubCategoryModel) onSubTap;
+class _PillButton extends StatelessWidget {
+  final IconData icon;
+  final String? emoji;
+  final String label;
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveBg;
+  final Color inactiveColor;
+  final bool showClose;
+  final VoidCallback onTap;
 
-  const _SubCategoryBar({
-    required this.category,
-    required this.selectedSubId,
-    required this.onSubTap,
+  const _PillButton({
+    required this.icon,
+    this.emoji,
+    required this.label,
+    required this.isActive,
+    required this.activeColor,
+    required this.inactiveBg,
+    required this.inactiveColor,
+    this.showClose = false,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color  = Color(int.parse('0xFF${category.color}'));
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      height: 48,
-      margin: const EdgeInsets.only(top: 6),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: category.subcategories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final sub = category.subcategories[i];
-          final isSelected = selectedSubId == sub.id ||
-              (selectedSubId == null && sub.id.endsWith('_1'));
-          final unselBg = isDark
-              ? color.withValues(alpha: 0.15)
-              : color.withValues(alpha: 0.08);
-
-          return GestureDetector(
-            onTap: () => onSubTap(sub),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? color : unselBg,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected ? color : color.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-                boxShadow: isSelected
-                    ? [BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      )]
-                    : [],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        decoration: BoxDecoration(
+          color: isActive ? activeColor : inactiveBg,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Эмoji болсо — ошону, болбосо иконка
+            if (isActive && emoji != null)
+              Text(emoji!, style: const TextStyle(fontSize: 14))
+            else
+              Icon(icon,
+                  size: 16,
+                  color: isActive ? Colors.white : inactiveColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppTextStyles.labelLarge.copyWith(
+                color: isActive ? Colors.white : inactiveColor,
+                fontSize: 13,
+                fontWeight:
+                    isActive ? FontWeight.w700 : FontWeight.w500,
               ),
-              child: Builder(builder: (ctx) {
-                final loc = AppLocalizations.of(ctx);
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(sub.icon, style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 5),
-                    Text(
-                      sub.localizedName(loc.locale.languageCode),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected
-                            ? Colors.white
-                            : color.withValues(
-                                alpha: isDark ? 1.0 : 0.85),
-                      ),
-                    ),
-                    // subItems бар болсо жебе көрсөт
-                    if (sub.hasSubItems) ...[
-                      const SizedBox(width: 3),
-                      Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 14,
-                        color: isSelected
-                            ? Colors.white.withValues(alpha: 0.8)
-                            : color.withValues(alpha: 0.6),
-                      ),
-                    ],
-                  ],
-                );
-              }),
             ),
-          );
-        },
+            if (showClose) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white.withValues(alpha: 0.8)),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════
-// 3-ДЕҢГЭЭЛ — SubSubCategory тилкеси
+// Бирдей стилдеги Pill тизмеси (2 жана 3-деңгээл үчүн)
 // ══════════════════════════════════════════════════════════
-class _SubSubCategoryBar extends StatelessWidget {
-  final SubCategoryModel parentSub;
-  final Color categoryColor;
-  final String? selectedSubSubId;
-  final Function(SubCategoryModel) onSubSubTap;
+class _PillRow extends StatelessWidget {
+  final List<SubCategoryModel> items;
+  final String selectedId;
+  final Color activeColor;
+  final bool isDark;
+  final double topMargin;
+  final bool isSubSub;
+  final Function(SubCategoryModel) onTap;
 
-  const _SubSubCategoryBar({
-    required this.parentSub,
-    required this.categoryColor,
-    required this.selectedSubSubId,
-    required this.onSubSubTap,
+  const _PillRow({
+    required this.items,
+    required this.selectedId,
+    required this.activeColor,
+    required this.isDark,
+    required this.topMargin,
+    required this.onTap,
+    this.isSubSub = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // 3-деңгээл үчүн бир аз башка түс (категория түсүнүн жеңилирээк варианты)
-    final color = HSLColor.fromColor(categoryColor)
-        .withLightness(
-            (HSLColor.fromColor(categoryColor).lightness - 0.1).clamp(0.0, 1.0))
-        .toColor();
+    final double rowHeight = isSubSub ? 40 : 44;
+    final double fontSize  = isSubSub ? 11.5 : 12.5;
+    final double iconSize  = isSubSub ? 13.0 : 14.0;
+    final EdgeInsets padding = isSubSub
+        ? const EdgeInsets.symmetric(horizontal: 11, vertical: 0)
+        : const EdgeInsets.symmetric(horizontal: 13, vertical: 0);
 
-    return Container(
-      height: 44,
-      margin: const EdgeInsets.only(top: 4),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: categoryColor.withValues(alpha: 0.15),
-            width: 1,
-          ),
-        ),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: parentSub.subItems.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (context, i) {
-          final subSub = parentSub.subItems[i];
-          final isSelected = selectedSubSubId == subSub.id;
-          final unselBg = isDark
-              ? color.withValues(alpha: 0.12)
-              : color.withValues(alpha: 0.06);
+    final unselBg = isDark
+        ? activeColor.withValues(alpha: 0.15)
+        : activeColor.withValues(alpha: 0.08);
+    final unselBorder = activeColor.withValues(alpha: 0.25);
+    final unselText = isDark
+        ? activeColor.withValues(alpha: 0.9)
+        : activeColor.withValues(alpha: 0.8);
 
-          return GestureDetector(
-            onTap: () => onSubSubTap(subSub),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? color : unselBg,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected
-                      ? color
-                      : color.withValues(alpha: 0.2),
-                  width: 1,
+    return SizedBox(
+      height: rowHeight + topMargin,
+      child: Padding(
+        padding: EdgeInsets.only(top: topMargin),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 7),
+          itemBuilder: (context, i) {
+            final item = items[i];
+            final isSelected = selectedId == item.id;
+
+            return GestureDetector(
+              onTap: () => onTap(item),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: padding,
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor : unselBg,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: isSelected ? activeColor : unselBorder,
+                    width: 1.5,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: activeColor.withValues(alpha: 0.28),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : [],
                 ),
-                boxShadow: isSelected
-                    ? [BoxShadow(
-                        color: color.withValues(alpha: 0.25),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      )]
-                    : [],
-              ),
-              child: Builder(builder: (ctx) {
-                final loc = AppLocalizations.of(ctx);
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(subSub.icon,
-                        style: const TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
-                    Text(
-                      subSub.localizedName(loc.locale.languageCode),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        color: isSelected
-                            ? Colors.white
-                            : color.withValues(
-                                alpha: isDark ? 0.9 : 0.8),
+                child: Builder(builder: (ctx) {
+                  final loc = AppLocalizations.of(ctx);
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(item.icon,
+                          style: TextStyle(fontSize: iconSize)),
+                      const SizedBox(width: 5),
+                      Text(
+                        item.localizedName(loc.locale.languageCode),
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isSelected ? Colors.white : unselText,
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }),
-            ),
-          );
-        },
+                      // SubItems бар болсо жебе
+                      if (!isSubSub && item.hasSubItems) ...[
+                        const SizedBox(width: 3),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 14,
+                          color: isSelected
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : activeColor.withValues(alpha: 0.6),
+                        ),
+                      ],
+                    ],
+                  );
+                }),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -610,7 +516,8 @@ class _CategoryBottomSheet extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 46, height: 46,
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? color.withValues(alpha: 0.2)

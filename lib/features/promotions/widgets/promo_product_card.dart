@@ -20,19 +20,21 @@ class PromoProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final cardColor  = isDark ? const Color(0xFF1E1E1E) : AppColors.white;
+    final nameColor  = isDark ? Colors.white : AppColors.black;
+    final errorBg    = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: isDark
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +52,7 @@ class PromoProductCard extends StatelessWidget {
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: AppColors.grey100,
+                        color: errorBg,
                         child: const Center(
                           child: Icon(Icons.image_not_supported_outlined,
                               color: AppColors.grey400),
@@ -100,7 +102,7 @@ class PromoProductCard extends StatelessWidget {
                   // Товардын аты
                   Text(
                     product.name,
-                    style: AppTextStyles.labelLarge,
+                    style: AppTextStyles.labelLarge.copyWith(color: nameColor),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
