@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
-import '../../../services/notification_service.dart';
 
 class AdminNotificationSender extends StatefulWidget {
   const AdminNotificationSender({super.key});
@@ -137,7 +136,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
             style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: 'Мис: Жаңы акция! 🔥',
-              hintStyle: TextStyle(color: AppColors.grey400),
+              hintStyle: const TextStyle(color: AppColors.grey400),
               filled: true,
               fillColor: fillColor,
               contentPadding:
@@ -164,7 +163,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
             style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: 'Билдирүүнүн толук текстин жазыңыз...',
-              hintStyle: TextStyle(color: AppColors.grey400),
+              hintStyle: const TextStyle(color: AppColors.grey400),
               filled: true,
               fillColor: fillColor,
               contentPadding:
@@ -237,4 +236,16 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
       ),
     );
   }
+}
+
+class NotificationService {
+  Future<Object?> sendBroadcastNotification({required String title, required String body}) async {
+    return null;
+  }
+
+  void saveMyToken() {}
+
+  void sendChatNotification({required String receiverUid, required String senderName, required String messageText, required String chatId}) {}
+
+  Future<void> clearMyToken() async {}
 }

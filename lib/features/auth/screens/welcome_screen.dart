@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dd_online/features/admin/widgets/admin_notification_sender.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,7 +10,6 @@ import '../../../core/auth_service.dart';
 import '../../home/screens/home_screen.dart';
 import '../../seller/screens/seller_login_screen.dart';
 import '../../../core/supabase_client.dart';
-import '../../../services/notification_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});

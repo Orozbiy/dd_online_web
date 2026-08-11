@@ -1,6 +1,6 @@
+import 'package:dd_online/features/admin/widgets/admin_notification_sender.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
-import '../services/notification_service.dart';
 
 /// Google Sign-In аркылуу Supabase Auth'ка кирүү/чыгуу логикасы.
 ///
@@ -73,7 +73,7 @@ class AuthService {
 
     // ✅ ОҢДОО: Google менен кирген соң FCM токенди сакта
     // Бул болбосо сатуучу жооп жазганда алуучуга уведомления жетпейт
-    await NotificationService().saveMyToken();
+    NotificationService().saveMyToken();
   }
 
   /// Колдонуучунун ролун (customer/seller/admin) алуу.

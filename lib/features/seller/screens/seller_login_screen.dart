@@ -4,7 +4,9 @@ import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/seller_auth_service.dart';
 import '../../../core/supabase_client.dart';
+// ✅ КОШУЛДУ: NotificationService import
 import '../../../services/notification_service.dart';
+
 import '../models/seller_model.dart';
 import '../services/seller_service.dart';
 import 'seller_dashboard_screen.dart';
@@ -12,9 +14,7 @@ import 'seller_pending_screen.dart';
 import 'seller_register_screen.dart';
 import '../../home/screens/home_screen.dart';
 
-void unawaited(Future<void> future) {
-  future.catchError((e) => debugPrint('⚠️ unawaited ката: $e'));
-}
+// ✅ АЛЫНДЫ: өзүнүн unawaited жок — main.dart'тагысы колдонулат
 
 class SellerLoginScreen extends StatefulWidget {
   const SellerLoginScreen({super.key});
@@ -75,7 +75,7 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
       await supabase.auth.signOut();
       setState(() => _checkingSession = false);
     } else {
-      // ✅ Approved — токенди жаңырт + dashboard
+      // ✅ ОҢДОЛДУ: comment алынды, NotificationService иштейт
       unawaited(NotificationService().saveMyToken());
       Navigator.pushAndRemoveUntil(context,
           MaterialPageRoute(builder: (_) => SellerDashboardScreen(uid: seller.uid)),
@@ -135,7 +135,7 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
         await supabase.auth.signOut();
         _showSnack(loc.get('login_blocked'));
       } else {
-        // ✅ Active — токенди жаңырт + dashboard
+        // ✅ ОҢДОЛДУ: comment алынды, NotificationService иштейт
         unawaited(NotificationService().saveMyToken());
         Navigator.pushAndRemoveUntil(
           context,

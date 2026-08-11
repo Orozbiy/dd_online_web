@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
@@ -27,8 +25,6 @@ class SellerProductScreen extends StatefulWidget {
 }
 
 class _SellerProductScreenState extends State<SellerProductScreen> {
-  static const _cloudName    = 'dedwm4krp';
-  static const _uploadPreset = 'dd-online';
 
   List<Map<String, dynamic>> _products = [];
   bool _isLoading = true;
@@ -150,28 +146,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     }
   }
 
-  Future<String?> _uploadToCloudinary(Uint8List bytes) async {
-    final loc = AppLocalizations.of(context);
-    try {
-      final uri     = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['upload_preset'] = _uploadPreset
-        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'product_${DateTime.now().millisecondsSinceEpoch}.jpg'));
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
-      final response         = await http.Response.fromStream(streamedResponse);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data['secure_url'] as String?;
-      }
-      final errorData = jsonDecode(response.body) as Map<String, dynamic>?;
-      final errorMsg  = errorData?['error']?['message'] ?? loc.get('error');
-      if (mounted) _showSnack('${loc.get('prod_img_upload_fail')}: $errorMsg', isError: true);
-      return null;
-    } catch (e) {
-      if (mounted) _showSnack('${loc.get('prod_check_internet')}: $e', isError: true);
-      return null;
-    }
-  }
 
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;

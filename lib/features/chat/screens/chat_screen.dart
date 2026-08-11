@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:dd_online/features/admin/widgets/admin_notification_sender.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +9,6 @@ import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 import '../../../core/utils/image_utils.dart';
-import '../../../services/notification_service.dart';
 import '../models/chat_model.dart';
 import '../models/message_model.dart';
 import '../services/chat_service.dart';
@@ -97,8 +96,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _initialLoadDone = true;
       });
       final myId = _myId;
-      if (myId != null && msgs.any((m) => m.senderId != myId && !m.isRead))
+      if (myId != null && msgs.any((m) => m.senderId != myId && !m.isRead)) {
         _markRead();
+      }
     });
     _markRead();
     _loadMyName();
@@ -175,10 +175,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void _scrollToBottom() {
     if (_scrollCtrl.hasClients) {
       Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollCtrl.hasClients)
+        if (_scrollCtrl.hasClients) {
           _scrollCtrl.animateTo(0,
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOut);
+        }
       });
     }
   }
@@ -290,7 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
             : (receiverLocale == 'ru' ? 'Покупатель' : 'Кардар');
       }
 
-      await NotificationService().sendChatNotification(
+      NotificationService().sendChatNotification(
         receiverUid: _receiverUid,
         senderName: senderName,
         messageText: text,
@@ -363,9 +364,10 @@ final url = await YandexStorageService.instance.uploadImage(
   folder: 'chat',
 );
       if (url == null) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(loc.get('chat_img_fail'))));
+        }
         return;
       }
       final replyTo = _replyingTo;
@@ -393,26 +395,6 @@ final url = await YandexStorageService.instance.uploadImage(
     }
   }
 
-  Future<String?> _uploadToCloudinary(Uint8List bytes) async {
-    try {
-      final uri =
-          Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['upload_preset'] = _uploadPreset
-        ..files.add(http.MultipartFile.fromBytes('file', bytes,
-            filename: 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg'));
-      final streamedResponse =
-          await request.send().timeout(const Duration(seconds: 60));
-      final response = await http.Response.fromStream(streamedResponse);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data['secure_url'] as String?;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
 
   Future<String?> _uploadAudioToCloudinary(String filePath) async {
     try {
@@ -442,9 +424,10 @@ final url = await YandexStorageService.instance.uploadImage(
     try {
       final url = await _uploadAudioToCloudinary(path);
       if (url == null) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(loc.get('chat_audio_fail'))));
+        }
         return;
       }
       final replyTo = _replyingTo;
@@ -625,12 +608,13 @@ final url = await YandexStorageService.instance.uploadImage(
     final reversedIndex = messages.indexWhere((m) => m.id == replyToId);
     if (reversedIndex == -1) return;
     final offset = (messages.length - 1 - reversedIndex) * 80.0;
-    if (_scrollCtrl.hasClients)
+    if (_scrollCtrl.hasClients) {
       _scrollCtrl.animateTo(
         offset.clamp(0.0, _scrollCtrl.position.maxScrollExtent),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    }
   }
 
   @override

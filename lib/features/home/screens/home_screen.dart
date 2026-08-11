@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dd_online/core/update_checker.dart' as UpdateChecker;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../config/theme/app_colors.dart';
@@ -24,11 +25,10 @@ import '../../product_detail/screens/product_detail_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../widgets/suggestion_button.dart';
 import '../widgets/product_card.dart';
-import '../../../services/notification_service.dart';
+
 import '../constants/home_colors.dart';
 import '../widgets/home_bottom_nav.dart';
 import '../widgets/home_background.dart';
-import '../../../core/update_checker.dart';
 
 // ══════════════════════════════════════════════════════
 // TAB индекстери
@@ -115,7 +115,7 @@ void initState() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final bottom = MediaQuery.of(context).padding.bottom;
     setState(() => _navBottomPadding = bottom > 0 ? bottom : 12);
-    NotificationService().saveMyToken();
+    
 
     // ✅ МАЙ КОШУУ — товарлар жүктөлүп бүткөндөн кийин версия текшер
     _checkAppUpdate();

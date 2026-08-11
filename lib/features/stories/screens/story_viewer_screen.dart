@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_video_player_plus/cached_video_player_plus.dart';
+import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/story_model.dart';
 import '../services/story_service.dart';
@@ -16,7 +16,6 @@ class StoryViewerScreen extends StatefulWidget {
   const StoryViewerScreen({
     super.key,
     required this.stories,
-
     this.initialIndex = 0,
   });
 
@@ -37,11 +36,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   bool _isPaused = false;
 
-  // ── Video player ──
-  CachedVideoPlayerPlusController? _videoCtrl;
+  // ── Video player (веб + мобайл) ──
+  VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
   bool _isVideoStory = false;
-  
 
   // ── Сүрөт жүктөлдүбү ──
   bool _imageReady = false;
@@ -63,7 +61,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    // AnimationController — сүрөт үчүн гана
     _progressCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: _imageDuration),
@@ -73,7 +70,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       curve:  Curves.linear,
     );
 
-    // БИР ЖОЛУ ГАНА баштайбыз
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadViewedIds();
       if (mounted) _startStory(_currentIndex);
@@ -142,7 +138,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     _disposeVideo();
 
-    // Прогрессти баштапкы абалга келтир
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
     _progressCtrl.reset();
@@ -154,25 +149,21 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       setState(() => _isVideoStory = true);
       await _initVideo(story.mediaUrl);
     } else {
-      // ── СҮРӨТ: жүктөлгөндөн кийин 5 секунд ──
       setState(() {
         _isVideoStory = false;
-        _imageReady = false; // жүктөлүп жатат
+        _imageReady   = false;
       });
       _progressCtrl.duration = const Duration(seconds: _imageDuration);
-      // Таймер _onImageLoaded() чакырылганда башталат
     }
   }
 
   // ─────────────────────────────────────────────
-  // Видео инициализация
+  // Видео инициализация — веб үчүн VideoPlayerController.networkUrl
   // ─────────────────────────────────────────────
   Future<void> _initVideo(String url) async {
     try {
-      final ctrl = CachedVideoPlayerPlusController.networkUrl(
-        Uri.parse(url),
-        invalidateCacheIfOlderThan: const Duration(days: 2),
-      );
+      // ✅ video_player пакети веб + мобайл экөөнү тең колдойт
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
       _videoCtrl = ctrl;
 
       await ctrl.initialize();
@@ -181,7 +172,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       setState(() => _videoReady = true);
       await ctrl.play();
 
-      // ── Таймер: видеонун позициясын окуп прогрессти жаңыртат ──
       _videoProgressTimer = Timer.periodic(
         const Duration(milliseconds: 50),
         (_) {
@@ -193,7 +183,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           final progress = (pos / dur).clamp(0.0, 1.0);
           setState(() => _videoProgress = progress);
 
-          // Видео бүткөндө (акыркы 200ms)
           if (pos >= dur - 200 && !_isPaused) {
             _videoProgressTimer?.cancel();
             _videoProgressTimer = null;
@@ -205,7 +194,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       debugPrint('❌ Video init error: $e');
       if (mounted) {
         setState(() {
-          _videoReady = false;
+          _videoReady   = false;
           _isVideoStory = false;
         });
         _progressCtrl.duration = const Duration(seconds: _imageDuration);
@@ -217,7 +206,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   // ── Сүрөт толук жүктөлгөндө чакырылат ──
   void _onImageLoaded() {
-    if (_imageReady || _isVideoStory) return; // эки жолу чакырылбасын
+    if (_imageReady || _isVideoStory) return;
     _imageReady = true;
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
@@ -226,7 +215,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progressCtrl.addStatusListener(_onProgressStatus);
   }
 
-  // Сүрөт прогресс бүттү
   void _onProgressStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
       _progressCtrl.removeStatusListener(_onProgressStatus);
@@ -288,7 +276,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     if (!_isPaused) return;
     if (_isVideoStory && _videoCtrl != null) {
       _videoCtrl!.play();
-      // Таймерди кайра баштайбыз
       final ctrl = _videoCtrl!;
       _videoProgressTimer = Timer.periodic(
         const Duration(milliseconds: 50),
@@ -388,7 +375,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ✅ Видео болсо — видеонун позициясы, сүрөт болсо — AnimationController
                     _isVideoStory
                         ? _VideoProgressBar(
                             count:        _stories.length,
@@ -465,13 +451,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         fit:      BoxFit.cover,
         width:    double.infinity,
         height:   double.infinity,
-        // ✅ Сүрөт жүктөлгөндөн кийин таймер башталат
         imageBuilder: (_, imageProvider) {
           WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
           return Image(
-            image: imageProvider,
-            fit: BoxFit.cover,
-            width: double.infinity,
+            image:  imageProvider,
+            fit:    BoxFit.cover,
+            width:  double.infinity,
             height: double.infinity,
           );
         },
@@ -479,7 +464,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           child: CircularProgressIndicator(color: Colors.white),
         ),
         errorWidget: (_, __, ___) {
-          // Ката болсо да таймерди башта
           WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
           return const Center(
             child: Icon(Icons.image_not_supported_outlined,
@@ -489,6 +473,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
 
+    // ✅ VideoPlayer виджети — веб + мобайл
     if (_videoReady && _videoCtrl != null && _videoCtrl!.value.isInitialized) {
       return SizedBox.expand(
         child: FittedBox(
@@ -496,7 +481,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           child: SizedBox(
             width:  _videoCtrl!.value.size.width,
             height: _videoCtrl!.value.size.height,
-            child:  CachedVideoPlayerPlus(_videoCtrl!),
+            child:  VideoPlayer(_videoCtrl!),
           ),
         ),
       );
@@ -517,12 +502,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 }
 
 // ─────────────────────────────────────────────
-// Видео прогресс сызыгы — double progress (0.0→1.0) кабыл алат
+// Видео прогресс сызыгы
 // ─────────────────────────────────────────────
 class _VideoProgressBar extends StatelessWidget {
-  final int count;
-  final int currentIndex;
-  final double progress; // 0.0 → 1.0, видеонун позициясынан
+  final int    count;
+  final int    currentIndex;
+  final double progress;
 
   const _VideoProgressBar({
     required this.count,

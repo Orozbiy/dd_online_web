@@ -4,7 +4,6 @@ import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../models/seller_model.dart';
 import '../services/seller_service.dart';
-import '../services/subscription_service.dart';
 import 'seller_product_screen.dart';
 import '../../chat/screens/chat_list_screen.dart';
 import '../../chat/services/chat_service.dart';
@@ -27,7 +26,6 @@ class SellerDashboardScreen extends StatefulWidget {
 
 class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   final _service     = SellerService();
-  final _subService  = SubscriptionService();
   final _chatService = ChatService();
 
   SellerModel? _seller;
@@ -279,168 +277,10 @@ void _showChangePhoneSheet() {
         MaterialPageRoute(builder: (_) => const HomeScreen()), (route) => false);
   }
 
-  void _showSubscriptionSheet() {
-    final loc      = AppLocalizations.of(context);
-    final cardCtrl = TextEditingController();
-    final expCtrl  = TextEditingController();
-    final cvvCtrl  = TextEditingController();
-    bool agreed = false;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Padding(
-          padding: EdgeInsets.only(
-              left: 20, right: 20, top: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                const Text('💳', style: TextStyle(fontSize: 28)),
-                const SizedBox(width: 10),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(loc.get('sub_monthly'), style: AppTextStyles.headingSmall),
-                  Text(loc.get('sub_charge_info'),
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500)),
-                ])),
-              ]),
-              if (_seller?.hasCard == true) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEFFF5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(children: [
-                    const Icon(Icons.credit_card, color: AppColors.success, size: 20),
-                    const SizedBox(width: 8),
-                    Text(_seller!.cardMasked ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success)),
-                    const SizedBox(width: 4),
-                    Text(loc.get('sub_card_linked'),
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey500)),
-                  ]),
-                ),
-              ],
-              const SizedBox(height: 20),
-              TextField(
-                controller: cardCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 19,
-                decoration: _inputDec(
-                  _seller?.hasCard == true ? loc.get('sub_new_card') : loc.get('sub_card_number'),
-                  '0000 0000 0000 0000',
-                ),
-                onChanged: (v) {
-                  final digits    = v.replaceAll(' ', '');
-                  final formatted = digits.replaceAllMapped(RegExp(r'.{1,4}'), (m) => '${m.group(0)} ').trim();
-                  cardCtrl.value  = TextEditingValue(text: formatted, selection: TextSelection.collapsed(offset: formatted.length));
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: TextField(controller: expCtrl, keyboardType: TextInputType.number, maxLength: 5, decoration: _inputDec(loc.get('sub_expiry'), 'MM/YY'))),
-                const SizedBox(width: 12),
-                Expanded(child: TextField(controller: cvvCtrl, keyboardType: TextInputType.number, maxLength: 3, obscureText: true, decoration: _inputDec('CVV', '•••'))),
-              ]),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => setS(() => agreed = !agreed),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Checkbox(value: agreed, onChanged: (v) => setS(() => agreed = v ?? false), activeColor: AppColors.primary),
-                  Expanded(child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(loc.get('sub_agree_text'), style: const TextStyle(fontSize: 13, color: Color(0xFF374151))),
-                  )),
-                ]),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity, height: 50,
-                child: ElevatedButton(
-                  onPressed: agreed && cardCtrl.text.replaceAll(' ', '').length == 16
-                      ? () => _saveCard(cardCtrl.text, ctx) : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.grey200,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    _seller?.hasCard == true ? loc.get('sub_replace_card') : loc.get('sub_link_card'),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              if (_seller?.autoPayEnabled == true) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity, height: 46,
-                  child: OutlinedButton(
-                    onPressed: () => _cancelSub(ctx),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.error),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text(loc.get('sub_cancel_autopay'),
-                        style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
-              if (_seller?.hasCard == true) ...[
-                const SizedBox(height: 8),
-                Center(child: TextButton(
-                  onPressed: () => _removeCard(ctx),
-                  child: Text(loc.get('sub_remove_card'),
-                      style: const TextStyle(color: AppColors.grey500, fontSize: 13)),
-                )),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  InputDecoration _inputDec(String label, String hint) => InputDecoration(
-        labelText: label, hintText: hint, counterText: '',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      );
 
-  Future<void> _saveCard(String cardNumber, BuildContext ctx) async {
-    final loc    = AppLocalizations.of(context);
-    Navigator.pop(ctx);
-    final digits = cardNumber.replaceAll(' ', '');
-    if (digits.length < 16) return;
-    final masked = '•••• ${digits.substring(12)}';
-    await _subService.saveCard(uid: _seller!.uid, cardToken: 'token_${digits.substring(12)}', cardMasked: masked);
-    await _loadSeller();
-    if (mounted) _showSnack(loc.get('sub_card_saved'), AppColors.success);
-  }
 
-  Future<void> _cancelSub(BuildContext ctx) async {
-    final loc = AppLocalizations.of(context);
-    Navigator.pop(ctx);
-    await _subService.cancelAutoPayment(_seller!.uid);
-    await _loadSeller();
-    if (mounted) _showSnack(loc.get('sub_autopay_cancelled'), AppColors.error);
-  }
-
-  Future<void> _removeCard(BuildContext ctx) async {
-    final loc = AppLocalizations.of(context);
-    Navigator.pop(ctx);
-    await _subService.removeCard(_seller!.uid);
-    await _loadSeller();
-    if (mounted) _showSnack(loc.get('sub_card_removed'), AppColors.grey600);
-  }
 
   @override
   Widget build(BuildContext context) {

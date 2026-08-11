@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 import '../core/supabase_client.dart';
@@ -10,37 +10,34 @@ import '../features/chat/screens/chat_screen.dart';
 import '../features/product_detail/screens/product_detail_screen.dart';
 import '../data/models/product_model.dart';
 
+// ── Мобайл гана: flutter_local_notifications ──
+import 'notification_service_mobile.dart'
+    if (dart.library.html) 'notification_service_stub.dart' as platform;
+
 // ─────────────────────────────────────────────────────────────
 // GLOBAL NAVIGATOR KEY — MaterialApp'ка берилет
 // ─────────────────────────────────────────────────────────────
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATION SERVICE
+// ─────────────────────────────────────────────────────────────
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
+  // ✅ Static fields — main.dart'тан жетүү үчүн
   static String? pendingChatId;
   static String? pendingProductId;
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotif =
-      FlutterLocalNotificationsPlugin();
-
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'chat_messages',
-    'Чат билдирүүлөрү',
-    description: 'DD Online чат билдирүүлөрү',
-    importance: Importance.max,
-    playSound: true,
-    enableVibration: true,
-  );
 
   // ─────────────────────────────────────────────────────────────
   // INIT
   // ─────────────────────────────────────────────────────────────
   Future<void> init() async {
-    debugPrint('🚀 NotificationService.init() башталды');
+    debugPrint('🚀 NotificationService.init() (веб: $kIsWeb)');
 
     await _messaging.requestPermission(
       alert: true,
@@ -48,43 +45,23 @@ class NotificationService {
       sound: true,
     );
 
-    await _localNotif
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
+    // ✅ Мобайл гана: local notifications
+    if (!kIsWeb) {
+      await platform.initLocalNotifications();
+    }
 
-    await _localNotif.initialize(
-      const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-      ),
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        final payload = response.payload ?? '';
-        debugPrint('🔔 [Foreground tap] payload=$payload');
-        if (payload.isEmpty) return;
-
-        if (payload.startsWith('chat:')) {
-          final chatId = payload.substring(5);
-          if (chatId.isNotEmpty) _navigateToChat(chatId);
-        } else if (payload.startsWith('product:')) {
-          final productId = payload.substring(8);
-          if (productId.isNotEmpty) navigateToProductPublic(productId);
-        } else {
-          _navigateToChat(payload);
-        }
-      },
-    );
-
+    // ── Foreground message ──
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('🔔 onMessage келди: ${message.data}');
-
       final chatId    = message.data['chatId']    as String?;
       final productId = message.data['productId'] as String?;
       final type      = message.data['type']      as String? ?? 'chat_message';
 
-      final notification = message.notification;
-      final title = notification?.title ?? message.data['senderName'] ?? 'DD Online';
-      final body  = notification?.body  ?? message.data['body']       ?? 'Жаңы билдирүү';
+      final title = message.notification?.title
+          ?? message.data['senderName']
+          ?? 'DD Online';
+      final body  = message.notification?.body
+          ?? message.data['body']
+          ?? 'Жаңы билдирүү';
 
       String payload = '';
       if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
@@ -95,36 +72,21 @@ class NotificationService {
         payload = 'chat:$chatId';
       }
 
-      _localNotif.show(
-        message.messageId.hashCode,
-        title,
-        body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channel.id,
-            _channel.name,
-            channelDescription: _channel.description,
-            importance: Importance.max,
-            priority: Priority.max,
-            icon: '@mipmap/ic_launcher',
-            playSound: true,
-            enableVibration: true,
-            channelShowBadge: true,
-            styleInformation: BigTextStyleInformation(body),
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: payload,
-      );
+      if (kIsWeb) {
+        _showWebSnackbar(title, body, payload);
+      } else {
+        platform.showLocalNotification(
+          id:      message.messageId.hashCode,
+          title:   title,
+          body:    body,
+          payload: payload,
+          onTap:   _handlePayload,
+        );
+      }
     });
 
+    // ── Background → Foreground tap ──
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
-      debugPrint('🔔 [Background→Foreground tap] data=${message.data}');
-
       final chatId    = message.data['chatId']    as String?;
       final productId = message.data['productId'] as String?;
       final type      = message.data['type']      as String? ?? 'chat_message';
@@ -140,31 +102,28 @@ class NotificationService {
       }
     });
 
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    if (!kIsWeb) {
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
 
     debugPrint('✅ NotificationService даяр');
   }
 
   // ─────────────────────────────────────────────────────────────
-  // TERMINATED STATE
+  // TERMINATED STATE — мобайл гана
   // ─────────────────────────────────────────────────────────────
   Future<void> handleInitialMessage() async {
     try {
       final message = await _messaging.getInitialMessage();
-      if (message == null) {
-        debugPrint('🔔 [Terminated] getInitialMessage: null');
-        return;
-      }
+      if (message == null) return;
 
       final chatId    = message.data['chatId']    as String?;
       final productId = message.data['productId'] as String?;
       final type      = message.data['type']      as String? ?? 'chat_message';
-
-      debugPrint('🔔 [Terminated→Open] type=$type chatId=$chatId productId=$productId');
 
       if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
         NotificationService.pendingChatId = chatId;
@@ -179,17 +138,67 @@ class NotificationService {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // ВЕБ: SnackBar аркылуу notification
+  // ─────────────────────────────────────────────────────────────
+  void _showWebSnackbar(String title, String body, String payload) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(body,
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E1E2E),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 4),
+        action: payload.isNotEmpty
+            ? SnackBarAction(
+                label: 'Ачуу',
+                textColor: const Color(0xFF4895EF),
+                onPressed: () => _handlePayload(payload),
+              )
+            : null,
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // PAYLOAD HANDLER
+  // ─────────────────────────────────────────────────────────────
+  void _handlePayload(String payload) {
+    if (payload.isEmpty) return;
+    if (payload.startsWith('chat:')) {
+      final chatId = payload.substring(5);
+      if (chatId.isNotEmpty) _navigateToChat(chatId);
+    } else if (payload.startsWith('product:')) {
+      final productId = payload.substring(8);
+      if (productId.isNotEmpty) navigateToProductPublic(productId);
+    } else {
+      _navigateToChat(payload);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // PUBLIC WRAPPERS
   // ─────────────────────────────────────────────────────────────
   Future<void> navigateToChatPublic(String chatId) => _navigateToChat(chatId);
-  Future<void> navigateToProductPublic(String productId) => _navigateToProduct(productId);
+  Future<void> navigateToProductPublic(String productId) =>
+      _navigateToProduct(productId);
 
   // ─────────────────────────────────────────────────────────────
   // NAVIGATE TO CHAT
   // ─────────────────────────────────────────────────────────────
   Future<void> _navigateToChat(String chatId) async {
-    debugPrint('🧭 _navigateToChat chatId=$chatId');
-
     BuildContext? context;
     for (int i = 0; i < 20; i++) {
       context = navigatorKey.currentContext;
@@ -198,7 +207,6 @@ class NotificationService {
     }
 
     if (context == null) {
-      debugPrint('⚠️ navigatorKey null — pendingChatId катары сактайбыз');
       NotificationService.pendingChatId = chatId;
       return;
     }
@@ -231,7 +239,7 @@ class NotificationService {
               .eq('id', productId)
               .maybeSingle();
           if (product != null) {
-            productName = product['title'] as String? ?? '';
+            productName  = product['title'] as String? ?? '';
             final images = product['images'] as List?;
             productImage = (images != null && images.isNotEmpty)
                 ? images.first as String
@@ -259,21 +267,19 @@ class NotificationService {
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
           builder: (_) => _ChatScreenProxy(
-            chatId:       chatId,
-            sellerName:   row['seller_name'] as String? ?? 'Сатуучу',
-            productName:  productName,
-            productImage: productImage,
-            isSeller:     isSeller,
-            buyerId:      row['buyer_id']  as String? ?? '',
-            sellerId:     row['seller_id'] as String? ?? '',
+            chatId:         chatId,
+            sellerName:     row['seller_name'] as String? ?? 'Сатуучу',
+            productName:    productName,
+            productImage:   productImage,
+            isSeller:       isSeller,
+            buyerId:        row['buyer_id']  as String? ?? '',
+            sellerId:       row['seller_id'] as String? ?? '',
             otherAvatarUrl: otherAvatarUrl,
           ),
         ),
       );
-
-      debugPrint('✅ ChatScreen navigate болду → isSeller=$isSeller');
     } catch (e) {
-      debugPrint('❌ _navigateToChat катасы: $e');
+      debugPrint('❌ _navigateToChat ката: $e');
     }
   }
 
@@ -281,8 +287,6 @@ class NotificationService {
   // NAVIGATE TO PRODUCT
   // ─────────────────────────────────────────────────────────────
   Future<void> _navigateToProduct(String productId) async {
-    debugPrint('🧭 _navigateToProduct productId=$productId');
-
     BuildContext? context;
     for (int i = 0; i < 15; i++) {
       context = navigatorKey.currentContext;
@@ -291,7 +295,6 @@ class NotificationService {
     }
 
     if (context == null) {
-      debugPrint('⚠️ navigatorKey null — pendingProductId катары сактайбыз');
       NotificationService.pendingProductId = productId;
       return;
     }
@@ -303,10 +306,7 @@ class NotificationService {
           .eq('id', productId)
           .maybeSingle();
 
-      if (data == null) {
-        debugPrint('⚠️ Product табылбады: productId=$productId');
-        return;
-      }
+      if (data == null) return;
 
       final product = ProductModel.fromMap(data);
 
@@ -316,15 +316,13 @@ class NotificationService {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
       );
-
-      debugPrint('✅ ProductDetailScreen\'ге navigate болду → productId=$productId');
     } catch (e) {
-      debugPrint('❌ _navigateToProduct катасы: $e');
+      debugPrint('❌ _navigateToProduct ката: $e');
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // SEND CHAT NOTIFICATION — FCM v1 API
+  // SEND CHAT NOTIFICATION — FCM v1
   // ─────────────────────────────────────────────────────────────
   Future<void> sendChatNotification({
     required String receiverUid,
@@ -332,7 +330,6 @@ class NotificationService {
     required String messageText,
     required String chatId,
   }) async {
-    debugPrint('📤 sendChatNotification → receiverUid=$receiverUid');
     try {
       final tokenRow = await supabase
           .from('push_tokens')
@@ -343,53 +340,53 @@ class NotificationService {
           .maybeSingle();
 
       final fcmToken = tokenRow?['token'] as String?;
-      if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint('⚠️ FCM токен табылбады, receiverUid=$receiverUid');
-        return;
-      }
+      if (fcmToken == null || fcmToken.isEmpty) return;
 
       final accessToken = await _getAccessToken();
-      if (accessToken == null) {
-        debugPrint('⚠️ Access Token алынбады');
-        return;
-      }
+      if (accessToken == null) return;
 
       const projectId = 'dd-online-web';
-      const url = 'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
+      const url =
+          'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
 
       final response = await http.post(
         Uri.parse(url),
         headers: {
           'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
+          'Content-Type':  'application/json',
         },
         body: jsonEncode({
           'message': {
             'token': fcmToken,
-            'notification': {
-              'title': senderName,
-              'body':  messageText,
-            },
+            'notification': {'title': senderName, 'body': messageText},
             'android': {
               'priority': 'high',
               'notification': {
-                'channel_id':             'chat_messages',
-                'sound':                  'default',
-                'default_vibrate_timings': true,
-                'notification_priority':  'PRIORITY_MAX',
-                'visibility':             'PUBLIC',
-                'click_action':           'FLUTTER_NOTIFICATION_CLICK',
+                'channel_id':              'chat_messages',
+                'sound':                   'default',
+                'default_vibrate_timings':  true,
+                'notification_priority':   'PRIORITY_MAX',
+                'visibility':              'PUBLIC',
+                'click_action':            'FLUTTER_NOTIFICATION_CLICK',
               },
             },
             'apns': {
               'payload': {
                 'aps': {
-                  'sound':             'default',
-                  'badge':              1,
-                  'content-available':  1,
+                  'sound':            'default',
+                  'badge':             1,
+                  'content-available': 1,
                 },
               },
               'headers': {'apns-priority': '10'},
+            },
+            'webpush': {
+              'notification': {
+                'title': senderName,
+                'body':  messageText,
+                'icon':  '/icons/Icon-192.png',
+              },
+              'fcm_options': {'link': '/'},
             },
             'data': {
               'chatId':     chatId,
@@ -402,27 +399,23 @@ class NotificationService {
         }),
       );
 
-      if (response.statusCode == 200) {
-        debugPrint('✅ Notification жиберилди → $senderName: $messageText');
-      } else {
+      if (response.statusCode != 200) {
         debugPrint('❌ FCM ката: ${response.statusCode} — ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Notification жибере алган жок: $e');
+      debugPrint('❌ sendChatNotification ката: $e');
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // БААРДЫГЫНА БИЛДИРҮҮ — Админ үчүн (push_tokens бардык токен)
+  // BROADCAST
   // ─────────────────────────────────────────────────────────────
   Future<int> sendBroadcastNotification({
     required String title,
     required String body,
   }) async {
-    debugPrint('📢 sendBroadcastNotification башталды');
     try {
       final rows = await supabase.from('push_tokens').select('token');
-
       final tokens = (rows as List)
           .map((r) => r['token'] as String?)
           .whereType<String>()
@@ -430,46 +423,35 @@ class NotificationService {
           .toSet()
           .toList();
 
-      if (tokens.isEmpty) {
-        debugPrint('⚠️ Токендер жок');
-        return 0;
-      }
-
-      debugPrint('📢 Жалпы токен саны: ${tokens.length}');
+      if (tokens.isEmpty) return 0;
 
       final accessToken = await _getAccessToken();
-      if (accessToken == null) {
-        debugPrint('⚠️ Access Token алынбады');
-        return 0;
-      }
+      if (accessToken == null) return 0;
 
       const projectId = 'dd-online-web';
-      const url = 'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
+      const url =
+          'https://fcm.googleapis.com/v1/projects/$projectId/messages:send';
 
       int successCount = 0;
-
       for (final token in tokens) {
         try {
           final response = await http.post(
             Uri.parse(url),
             headers: {
               'Authorization': 'Bearer $accessToken',
-              'Content-Type': 'application/json',
+              'Content-Type':  'application/json',
             },
             body: jsonEncode({
               'message': {
                 'token': token,
-                'notification': {
-                  'title': title,
-                  'body':  body,
-                },
+                'notification': {'title': title, 'body': body},
                 'android': {
                   'priority': 'high',
                   'notification': {
-                    'channel_id':             'chat_messages',
-                    'sound':                  'default',
-                    'notification_priority':  'PRIORITY_MAX',
-                    'default_vibrate_timings': true,
+                    'channel_id':              'chat_messages',
+                    'sound':                   'default',
+                    'notification_priority':   'PRIORITY_MAX',
+                    'default_vibrate_timings':  true,
                   },
                 },
                 'apns': {
@@ -478,32 +460,26 @@ class NotificationService {
                   },
                   'headers': {'apns-priority': '10'},
                 },
-                'data': {
-                  'type':  'admin_broadcast',
-                  'title': title,
-                  'body':  body,
+                'webpush': {
+                  'notification': {
+                    'title': title,
+                    'body':  body,
+                    'icon':  '/icons/Icon-192.png',
+                  },
                 },
+                'data': {'type': 'admin_broadcast', 'title': title, 'body': body},
               },
             }),
           );
-
           if (response.statusCode == 200) {
             successCount++;
-          } else {
-            // Эски/жараксыз токенди базадан өчүр
-            if (response.statusCode == 404 ||
-                response.body.contains('UNREGISTERED') ||
-                response.body.contains('INVALID_ARGUMENT')) {
-              await supabase.from('push_tokens').delete().eq('token', token);
-              debugPrint('🗑️ Эски токен өчүрүлдү');
-            }
+          } else if (response.statusCode == 404 ||
+              response.body.contains('UNREGISTERED') ||
+              response.body.contains('INVALID_ARGUMENT')) {
+            await supabase.from('push_tokens').delete().eq('token', token);
           }
-        } catch (e) {
-          debugPrint('❌ Token жөнөтүүдө ката: $e');
-        }
+        } catch (_) {}
       }
-
-      debugPrint('✅ Broadcast аяктады: $successCount/${tokens.length} жеткирилди');
       return successCount;
     } catch (e) {
       debugPrint('❌ sendBroadcastNotification ката: $e');
@@ -515,40 +491,33 @@ class NotificationService {
   // TEST NOTIFICATION
   // ─────────────────────────────────────────────────────────────
   Future<void> showTestNotification() async {
-    await _localNotif.show(
-      999,
-      'DD Online 🛍️',
-      'Уведомления иштеп жатат!',
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channel.id,
-          _channel.name,
-          channelDescription: _channel.description,
-          importance: Importance.max,
-          priority: Priority.max,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-    );
+    if (kIsWeb) {
+      _showWebSnackbar('DD Online 🛍️', 'Уведомления иштеп жатат!', '');
+    } else {
+      await platform.showLocalNotification(
+        id:      999,
+        title:   'DD Online 🛍️',
+        body:    'Уведомления иштеп жатат!',
+        payload: '',
+        onTap:   _handlePayload,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // FCM TOKEN — Supabase'ка сактоо / өчүрүү
+  // FCM TOKEN
   // ─────────────────────────────────────────────────────────────
   Future<void> saveMyToken() async {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final token = await _messaging.getToken();
+      final token = await _messaging.getToken(
+        vapidKey: kIsWeb
+            ? 'YOUR_VAPID_KEY' // ← Firebase Console → Web Push certificates
+            : null,
+      );
       if (token == null) return;
-
-      debugPrint('💾 FCM Token сакталууда...');
 
       await supabase.from('push_tokens').delete().eq('user_id', user.id);
       await supabase.from('push_tokens').insert({
@@ -557,8 +526,6 @@ class NotificationService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-      debugPrint('✅ FCM Token сакталды: ${token.substring(0, 20)}...');
-
       _messaging.onTokenRefresh.listen((newToken) async {
         await supabase.from('push_tokens').delete().eq('user_id', user.id);
         await supabase.from('push_tokens').insert({
@@ -566,10 +533,9 @@ class NotificationService {
           'token':      newToken,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        debugPrint('✅ FCM Token жаңырды');
       });
     } catch (e) {
-      debugPrint('❌ Token сактоо катасы: $e');
+      debugPrint('❌ saveMyToken ката: $e');
     }
   }
 
@@ -578,35 +544,33 @@ class NotificationService {
       final user = supabase.auth.currentUser;
       if (user == null) return;
       await supabase.from('push_tokens').delete().eq('user_id', user.id);
-      debugPrint('🗑️ FCM Token өчүрүлдү (user_id=${user.id})');
     } catch (e) {
-      debugPrint('❌ Token өчүрүү катасы: $e');
+      debugPrint('❌ clearMyToken ката: $e');
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ACCESS TOKEN (Google Service Account)
+  // ACCESS TOKEN
   // ─────────────────────────────────────────────────────────────
   Future<String?> _getAccessToken() async {
     try {
       final jsonString = await rootBundle.loadString('service_account.json');
-      final json = jsonDecode(jsonString);
-      final accountCredentials = ServiceAccountCredentials.fromJson(json);
-      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-      final client = await clientViaServiceAccount(accountCredentials, scopes);
-      final token = client.credentials.accessToken.data;
+      final json       = jsonDecode(jsonString);
+      final creds      = ServiceAccountCredentials.fromJson(json);
+      final scopes     = ['https://www.googleapis.com/auth/firebase.messaging'];
+      final client     = await clientViaServiceAccount(creds, scopes);
+      final token      = client.credentials.accessToken.data;
       client.close();
       return token;
     } catch (e) {
-      debugPrint('❌ Access Token ката: $e');
+      debugPrint('❌ _getAccessToken ката: $e');
       return null;
     }
   }
-
-} // ← NotificationService классы бул жерде ЖАБЫЛАТ
+}
 
 // ─────────────────────────────────────────────────────────────
-// _ChatScreenProxy — circular import'тан качуу үчүн
+// _ChatScreenProxy
 // ─────────────────────────────────────────────────────────────
 class _ChatScreenProxy extends StatelessWidget {
   final String chatId;

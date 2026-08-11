@@ -82,12 +82,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } catch (_) {}
   }
 
-  Future<void> _clearCacheKey() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
-    } catch (_) {}
-  }
 
   // ════════════════════════════════════════════════════
   // SELECTION MODE

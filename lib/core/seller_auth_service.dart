@@ -1,5 +1,4 @@
 import '../features/seller/models/seller_model.dart';
-import '../services/notification_service.dart';
 import 'supabase_client.dart';
 import 'package:flutter/foundation.dart';
 
@@ -62,7 +61,7 @@ class SellerAuthService {
         .single();
 
     // ✅ FCM токенди сакта
-    await NotificationService().saveMyToken();
+
 
     // ✅ Adminге Telegram билдирүү жөнөт
    try {
@@ -122,7 +121,7 @@ class SellerAuthService {
       throw const SellerRejectedException();
     }
 
-    await NotificationService().saveMyToken();
+  
 
     return SellerModel.fromJson(row);
   }
