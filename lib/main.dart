@@ -67,7 +67,10 @@ Future<void> main() async {
     await FavoritesManager().loadFromPrefs();
   }
 
-  unawaited(NotificationService().saveMyToken());
+  // ✅ ОҢДОО: saveMyToken веб'де чакырылбайт — Firebase даяр эмес
+  if (!kIsWeb) {
+    unawaited(NotificationService().saveMyToken());
+  }
 
   runApp(const ActiveStatusTracker(child: DDOnlineApp()));
 }
@@ -224,7 +227,6 @@ class _SplashRouterState extends State<SplashRouter> {
   }
 
   Future<void> _determineScreen() async {
-    // ✅ ОҢДОО: SharedPreferences веб'де бекип калышы мүмкүн — timeout кош
     String langCode = 'ky';
     try {
       final prefs = await SharedPreferences.getInstance()
@@ -232,16 +234,14 @@ class _SplashRouterState extends State<SplashRouter> {
       langCode = prefs.getString('app_locale') ?? 'ky';
     } catch (e) {
       debugPrint('⚠️ SharedPreferences timeout: $e');
-      // Демейки тилди колдон, улантабыз
     }
 
-    // ✅ ОҢДОО: _getTargetScreen да timeout — бекип калбасын
     try {
       _targetScreen = await _getTargetScreen()
           .timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('⚠️ _getTargetScreen timeout: $e');
-      _targetScreen = const WelcomeScreen(); // Ката болсо Welcome экран
+      _targetScreen = const WelcomeScreen();
     }
 
     if (mounted) setState(() => _checking = false);
@@ -280,7 +280,10 @@ class _SplashRouterState extends State<SplashRouter> {
   Future<Widget> _getTargetScreen() async {
     final user = supabase.auth.currentSession?.user;
     if (user != null) {
-      unawaited(NotificationService().saveMyToken());
+      // ✅ ОҢДОО: saveMyToken веб'де чакырылбайт
+      if (!kIsWeb) {
+        unawaited(NotificationService().saveMyToken());
+      }
       return const HomeScreen();
     }
     return const WelcomeScreen();

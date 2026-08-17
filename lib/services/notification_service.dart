@@ -155,89 +155,102 @@ class NotificationService {
   // NAVIGATE TO CHAT
   // ─────────────────────────────────────────────────────────────
   Future<void> _navigateToChat(String chatId) async {
-    BuildContext? context;
-    for (int i = 0; i < 20; i++) {
-      context = navigatorKey.currentContext;
-      if (context != null) break;
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
+  BuildContext? context;
+  for (int i = 0; i < 20; i++) {
+    context = navigatorKey.currentContext;
+    if (context != null) break;
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
 
-    if (context == null) {
+  if (context == null) {
+    NotificationService.pendingChatId = chatId;
+    return;
+  }
+
+  try {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
       NotificationService.pendingChatId = chatId;
       return;
     }
 
+    // ✅ seller_name жок — stores'тен алабыз
+    final row = await supabase
+        .from('chats')
+        .select('id, seller_id, buyer_id, product_id')
+        .eq('id', chatId)
+        .maybeSingle();
+
+    if (row == null) return;
+
+    final isSeller  = row['seller_id'] == user.id;
+    final sellerId  = row['seller_id'] as String? ?? '';
+
+    // ✅ seller_name — stores таблицасынан
+    String sellerName = 'Сатуучу';
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        NotificationService.pendingChatId = chatId;
-        return;
-      }
-
-      final row = await supabase
-          .from('chats')
-          .select('id, seller_id, buyer_id, product_id, seller_name')
-          .eq('id', chatId)
+      final store = await supabase
+          .from('stores')
+          .select('store_name')
+          .eq('owner_id', sellerId)
           .maybeSingle();
+      sellerName = store?['store_name'] as String? ?? 'Сатуучу';
+    } catch (_) {}
 
-      if (row == null) return;
-
-      final isSeller = row['seller_id'] == user.id;
-
-      String productName  = '';
-      String productImage = '';
-      final productId = row['product_id'] as String?;
-      if (productId != null) {
-        try {
-          final product = await supabase
-              .from('products')
-              .select('title, images')
-              .eq('id', productId)
-              .maybeSingle();
-          if (product != null) {
-            productName  = product['title'] as String? ?? '';
-            final images = product['images'] as List?;
-            productImage = (images != null && images.isNotEmpty)
-                ? images.first as String
-                : '';
-          }
-        } catch (_) {}
-      }
-
-      String otherAvatarUrl = '';
-      final otherUserId = isSeller
-          ? row['buyer_id']  as String? ?? ''
-          : row['seller_id'] as String? ?? '';
+    String productName  = '';
+    String productImage = '';
+    final productId = row['product_id'] as String?;
+    if (productId != null) {
       try {
-        final profile = await supabase
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', otherUserId)
+        final product = await supabase
+            .from('products')
+            .select('title, images')
+            .eq('id', productId)
             .maybeSingle();
-        otherAvatarUrl = profile?['avatar_url'] as String? ?? '';
+        if (product != null) {
+          productName  = product['title'] as String? ?? '';
+          final images = product['images'] as List?;
+          productImage = (images != null && images.isNotEmpty)
+              ? images.first as String
+              : '';
+        }
       } catch (_) {}
-
-      context = navigatorKey.currentContext;
-      if (context == null || !context.mounted) return;
-
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (_) => _ChatScreenProxy(
-            chatId:         chatId,
-            sellerName:     row['seller_name'] as String? ?? 'Сатуучу',
-            productName:    productName,
-            productImage:   productImage,
-            isSeller:       isSeller,
-            buyerId:        row['buyer_id']  as String? ?? '',
-            sellerId:       row['seller_id'] as String? ?? '',
-            otherAvatarUrl: otherAvatarUrl,
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint('❌ _navigateToChat ката: $e');
     }
+
+    String otherAvatarUrl = '';
+    final otherUserId = isSeller
+        ? row['buyer_id']  as String? ?? ''
+        : sellerId;
+    try {
+      final profile = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', otherUserId)
+          .maybeSingle();
+      otherAvatarUrl = profile?['avatar_url'] as String? ?? '';
+    } catch (_) {}
+
+    context = navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => _ChatScreenProxy(
+          chatId:         chatId,
+          sellerName:     sellerName,
+          productName:    productName,
+          productImage:   productImage,
+          isSeller:       isSeller,
+          buyerId:        row['buyer_id']  as String? ?? '',
+          sellerId:       sellerId,
+          otherAvatarUrl: otherAvatarUrl,
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint('❌ _navigateToChat ката: $e');
   }
+}
 
   // ─────────────────────────────────────────────────────────────
   // NAVIGATE TO PRODUCT
@@ -418,34 +431,40 @@ class NotificationService {
   // FCM TOKEN
   // ─────────────────────────────────────────────────────────────
   Future<void> saveMyToken() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
+  try {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-      final token = await _messaging.getToken(
-        vapidKey: 'YOUR_VAPID_KEY', // ← Firebase Console → Web Push certificates
+    String? token;
+
+    if (kIsWeb) {
+      // ВЕБ үчүн VAPID ачкычы керек
+      token = await _messaging.getToken(
+        vapidKey: 'BDpKYBHjHAilY1jGXlduqw1eJ6lSsmxwkJ8dIgag-2svdBpjn_QsiN2BrSbBboBNmVh2ZI-AQqZe3zaOjFsdXL0',
       );
-      if (token == null) return;
+    } else {
+      token = await _messaging.getToken();
+    }
 
-      await supabase.from('push_tokens').delete().eq('user_id', user.id);
-      await supabase.from('push_tokens').insert({
+    if (token == null) return;
+
+    debugPrint('💾 FCM Token сакталууда...');
+
+    await supabase.from('push_tokens').upsert(
+      {
         'user_id':    user.id,
         'token':      token,
+        'platform':   kIsWeb ? 'web' : 'mobile',
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      },
+      onConflict: 'user_id',
+    );
 
-      _messaging.onTokenRefresh.listen((newToken) async {
-        await supabase.from('push_tokens').delete().eq('user_id', user.id);
-        await supabase.from('push_tokens').insert({
-          'user_id':    user.id,
-          'token':      newToken,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-      });
-    } catch (e) {
-      debugPrint('❌ saveMyToken ката: $e');
-    }
+    debugPrint('✅ FCM Token сакталды: ${token.substring(0, 20)}...');
+  } catch (e) {
+    debugPrint('❌ saveMyToken ката: $e');
   }
+}
 
   Future<void> clearMyToken() async {
     try {
