@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
@@ -10,6 +11,7 @@ Future<Uint8List> compressImage(
   int maxWidth = 800,
   int maxHeight = 800,
 }) async {
+  if (kIsWeb) return bytes;
   final result = await FlutterImageCompress.compressWithList(
     bytes,
     minWidth: maxWidth,
@@ -23,6 +25,7 @@ Future<Uint8List> compressImage(
 
 /// Чат сүрөттөрү үчүн
 Future<Uint8List> compressChatImage(Uint8List bytes) async {
+  if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
     bytes,
     minWidth: 800,
@@ -34,6 +37,7 @@ Future<Uint8List> compressChatImage(Uint8List bytes) async {
 
 /// Story сүрөттөрү үчүн
 Future<Uint8List> compressStoryImage(Uint8List bytes) async {
+  if (kIsWeb) return bytes;
   return FlutterImageCompress.compressWithList(
     bytes,
     minWidth: 1080,
@@ -48,11 +52,13 @@ Future<Uint8List> compressStoryImage(Uint8List bytes) async {
 // WATERMARK — dart:ui, сервер жок
 // ─────────────────────────────────────────────────────────────
 
-/// Товар сүрөтүнө "DD Online" watermark кош (ылдый ортосунда)
+/// Товар сүрөтүнө "DD Online" watermark кош
 Future<Uint8List> addWatermark(Uint8List bytes) async {
-  final codec  = await ui.instantiateImageCodec(bytes);
-  final frame  = await codec.getNextFrame();
-  final src    = frame.image;
+  if (kIsWeb) return bytes;
+
+  final codec = await ui.instantiateImageCodec(bytes);
+  final frame = await codec.getNextFrame();
+  final src   = frame.image;
 
   try {
     final w = src.width.toDouble();
@@ -62,7 +68,7 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
     final canvas   = Canvas(recorder);
     canvas.drawImage(src, Offset.zero, Paint());
 
-    final fontSize = w * 0.042;
+    final fontSize  = w * 0.042;
     final textColor = const Color(0x26FFFFFF);
 
     final positions = [
@@ -107,7 +113,6 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
       final byteData = await finalImg.toByteData(
         format: ui.ImageByteFormat.png,
       );
-
       return FlutterImageCompress.compressWithList(
         byteData!.buffer.asUint8List(),
         minWidth:  src.width,
@@ -119,14 +124,46 @@ Future<Uint8List> addWatermark(Uint8List bytes) async {
       finalImg.dispose();
     }
   } finally {
-    src.dispose(); // ← src колдонулуп бүткөндөн КИЙИН dispose
+    src.dispose();
   }
 }
 
-// Cloudinary URL thumbnail
-String toCloudinaryThumb(String url, {int width = 400}) {
+// ─────────────────────────────────────────────────────────────
+// THUMBNAIL URL — бардык storage'ларды колдойт
+// ─────────────────────────────────────────────────────────────
+
+/// Универсал thumbnail URL
+/// Cloudinary, Supabase, Backblaze B2 URL'дарын туура иштетет
+String toThumbUrl(String url, {int width = 400}) {
+  if (url.isEmpty) return url;
+
+  // Cloudinary — трансформация параметри менен
   if (url.contains('res.cloudinary.com') && url.contains('/upload/')) {
     return url.replaceFirst('/upload/', '/upload/w_$width,q_auto,f_auto/');
   }
+
+  // Supabase Storage — width/quality/resize параметрлери менен
+  if (url.contains('supabase.co/storage')) {
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      final params = Map<String, String>.from(uri.queryParameters);
+      params['width']   = width.toString();
+      params['quality'] = '80';
+      params['resize']  = 'cover';
+      return uri.replace(queryParameters: params).toString();
+    }
+  }
+
+  // Backblaze B2 — трансформация жок, өзгөртүүсүз
+  if (url.contains('backblazeb2.com') || url.contains('s3.eu-central-003')) {
+    return url;
+  }
+
   return url;
+}
+
+/// Эски функция — артка шайкештик үчүн сакталды
+/// Жаңы код toThumbUrl колдонсун
+String toCloudinaryThumb(String url, {int width = 400}) {
+  return toThumbUrl(url, width: width);
 }
