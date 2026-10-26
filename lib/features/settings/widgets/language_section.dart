@@ -17,27 +17,18 @@ class _LanguageSectionState extends State<LanguageSection> {
     final selected = provider.locale.languageCode;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final dividerColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      padding: EdgeInsets.zero, // Тышкы артыкча паддингдер алынды
+      decoration: const BoxDecoration(
+        color: Colors.transparent, // Кара фон толугу менен тунук кылынды
       ),
       child: Column(
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(4, 16, 4, 8),
+            padding: EdgeInsets.fromLTRB(0, 12, 0, 8),
             child: Row(
               children: [
                 Icon(Icons.language, color: AppColors.primary, size: 20),

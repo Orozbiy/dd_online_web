@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../../config/theme/app_colors.dart';
 import '../../../../config/theme/app_text_styles.dart';
+import '../../../../config/theme/dd_design.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 import '../../../data/models/product_model.dart';
@@ -64,36 +66,71 @@ class _PromotionScreenState extends State<PromotionScreen> {
     final loc = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final inputBg = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
-    final dividerColor =
-        isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
     final filtered = _filtered;
 
     return Scaffold(
       backgroundColor: bgColor,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: (isDark ? DD.bgDark : Colors.white).withValues(alpha: isDark ? 0.75 : 0.85),
+                border: Border(
+                  bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFEDEDF0)),
+                ),
+              ),
+            ),
+          ),
+        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back,
-              color: isDark ? Colors.white : AppColors.black),
+          icon: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFEDEDF0)),
+              boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))],
+            ),
+            child: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : AppColors.black, size: 18),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(loc.get('promo_title')),
-        backgroundColor: cardColor,
-        foregroundColor: isDark ? Colors.white : AppColors.black,
-        elevation: 0,
-        centerTitle: true,
-        titleTextStyle: AppTextStyles.headingMedium,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: dividerColor),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                gradient: DD.accentGradient,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [BoxShadow(color: DD.accent.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))],
+              ),
+              child: const Icon(Icons.local_offer_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              loc.get('promo_title'),
+              style: AppTextStyles.headingMedium.copyWith(
+                color: isDark ? Colors.white : AppColors.black,
+                fontSize: 17,
+              ),
+            ),
+          ],
         ),
+        foregroundColor: isDark ? Colors.white : AppColors.black,
+        centerTitle: true,
       ),
       body: Column(
         children: [
           // ── Search Bar ──
           Container(
-            color: cardColor,
+            color: Colors.transparent,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: TextField(
               controller: _searchController,
@@ -192,7 +229,6 @@ class _PromoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final cur = loc.get('currency');
     final price = (product['price'] as num?)?.toDouble() ?? 0;
     final discounted =
@@ -216,90 +252,199 @@ class _PromoCard extends StatelessWidget {
               builder: (_) => ProductDetailScreen(product: productModel))),
       child: Container(
         decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2))
+              color: isDark
+                  ? DD.accent.withOpacity(0.20)
+                  : Colors.black.withOpacity(0.07),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+              spreadRadius: -4,
+            ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Сүрөт + Badge ──
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.network(
-                    imageUrl,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 150,
-                      color: AppColors.grey100,
-                      child: const Center(
-                          child: Icon(Icons.image_not_supported_outlined,
-                              color: AppColors.grey400)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // ── Карточка фону ──
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0E0A07) : Colors.white,
+                  border: Border.all(
+                    color: isDark
+                        ? DD.accent.withOpacity(0.22)
+                        : const Color(0xFFF0F0F2),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+              // ── Фон жарык (dark режим) ──
+              if (isDark)
+                Positioned(
+                  top: -20, left: -20,
+                  child: Container(
+                    width: 90, height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [
+                        DD.accent2.withOpacity(0.15),
+                        Colors.transparent,
+                      ]),
                     ),
                   ),
                 ),
-                if (percent > 0)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: AppColors.error,
-                          borderRadius: BorderRadius.circular(8)),
-                      child: Text('-$percent%',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-              ],
-            ),
-            // ── Маалымат ──
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name,
-                      style: AppTextStyles.labelLarge,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  if (shopName.isNotEmpty)
-                    Text(shopName,
-                        style: AppTextStyles.bodySmall
-                            .copyWith(color: AppColors.grey500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${discounted.toStringAsFixed(0)} $cur',
-                    style: AppTextStyles.labelLarge
-                        .copyWith(color: AppColors.success),
+                  // ── Сүрөт + Badge ──
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        child: imageUrl.isNotEmpty
+                            ? Image.network(
+                                imageUrl,
+                                height: 150,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: isDark
+                                        ? [const Color(0xFF1A0E07), const Color(0xFF120A04)]
+                                        : [AppColors.grey100, AppColors.grey200]),
+                                  ),
+                                  child: const Center(child: Icon(Icons.image_not_supported_outlined, color: AppColors.grey400)),
+                                ),
+                              )
+                            : Container(
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: isDark
+                                      ? [const Color(0xFF1A0E07), const Color(0xFF120A04)]
+                                      : [AppColors.grey100, AppColors.grey200]),
+                                ),
+                                child: const Center(child: Icon(Icons.image_outlined, color: AppColors.grey400)),
+                              ),
+                      ),
+                      // ── Фото үстүнө градиент ──
+                      Positioned(
+                        bottom: 0, left: 0, right: 0,
+                        child: Container(
+                          height: 55,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.transparent, Colors.black.withOpacity(0.45)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (percent > 0)
+                        Positioned(
+                          top: 8, left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: DD.accentGradient,
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: [BoxShadow(color: DD.accent.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 2))],
+                            ),
+                            child: Text('-$percent%',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      // ── "Аксия" белгиси ──
+                      Positioned(
+                        bottom: 8, right: 8,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.50),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.local_offer_rounded, color: Colors.white70, size: 10),
+                                  SizedBox(width: 3),
+                                  Text('Аксия', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${price.toStringAsFixed(0)} $cur',
-                    style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.grey400,
-                        decoration: TextDecoration.lineThrough),
+                  // ── Маалымат ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: isDark ? Colors.white.withOpacity(0.90) : AppColors.black,
+                              fontSize: 13, height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis),
+                        if (shopName.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(Icons.store_rounded, size: 10, color: isDark ? Colors.white30 : AppColors.grey400),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(shopName,
+                                    style: AppTextStyles.bodySmall.copyWith(color: isDark ? Colors.white30 : AppColors.grey500),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 7),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '${discounted.toStringAsFixed(0)} $cur',
+                              style: TextStyle(
+                                color: isDark ? const Color(0xFF4ADE80) : AppColors.success,
+                                fontSize: 16, fontWeight: FontWeight.w800,
+                                shadows: isDark ? [const Shadow(color: Color(0x404ADE80), blurRadius: 8)] : [],
+                              ),
+                            ),
+                            if (percent > 0) ...[
+                              const SizedBox(width: 5),
+                              Text(
+                                '${price.toStringAsFixed(0)}',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.grey400,
+                                    fontSize: 10,
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationColor: AppColors.grey400),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

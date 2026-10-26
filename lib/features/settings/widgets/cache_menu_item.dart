@@ -12,7 +12,7 @@ class CacheMenuItem extends StatefulWidget {
 }
 
 class _CacheMenuItemState extends State<CacheMenuItem> {
-  static const String _appVersion = 'v1.0.0';
+  static const String _appVersion = 'v20.04';
   bool _isClearing = false;
 
   Future<void> _onTap(BuildContext context) async {

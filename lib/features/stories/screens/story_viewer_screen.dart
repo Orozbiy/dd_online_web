@@ -8,6 +8,8 @@ import '../models/story_model.dart';
 import '../services/story_service.dart';
 import '../widgets/story_progress_bar.dart';
 import '../widgets/story_like_button.dart';
+import '../widgets/story_comments_sheet.dart';
+import '../../../core/app_localizations.dart';
 
 class StoryViewerScreen extends StatefulWidget {
   final List<StoryModel> stories;
@@ -16,6 +18,7 @@ class StoryViewerScreen extends StatefulWidget {
   const StoryViewerScreen({
     super.key,
     required this.stories,
+
     this.initialIndex = 0,
   });
 
@@ -36,10 +39,11 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   bool _isPaused = false;
 
-  // ── Video player (веб + мобайл) ──
+  // ── Video player ──
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
   bool _isVideoStory = false;
+  
 
   // ── Сүрөт жүктөлдүбү ──
   bool _imageReady = false;
@@ -53,6 +57,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
   // ── Viewed IDs ──
   Set<String> _viewedIds = {};
 
+  // ── Комментарий саны (storyId → сан) ──
+  final Map<String, int> _commentCounts = {};
+  bool _commentsOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +69,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
+    // AnimationController — сүрөт үчүн гана
     _progressCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: _imageDuration),
@@ -70,6 +79,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       curve:  Curves.linear,
     );
 
+    // БИР ЖОЛУ ГАНА баштайбыз
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadViewedIds();
       if (mounted) _startStory(_currentIndex);
@@ -138,31 +148,34 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     _disposeVideo();
 
+    // Прогрессти баштапкы абалга келтир
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
     _progressCtrl.reset();
 
     final story = _stories[index];
     _markViewed(story.id);
+    _loadCommentCount(story.id);
 
     if (story.isVideo) {
       setState(() => _isVideoStory = true);
       await _initVideo(story.mediaUrl);
     } else {
+      // ── СҮРӨТ: жүктөлгөндөн кийин 5 секунд ──
       setState(() {
         _isVideoStory = false;
-        _imageReady   = false;
+        _imageReady = false; // жүктөлүп жатат
       });
       _progressCtrl.duration = const Duration(seconds: _imageDuration);
+      // Таймер _onImageLoaded() чакырылганда башталат
     }
   }
 
   // ─────────────────────────────────────────────
-  // Видео инициализация — веб үчүн VideoPlayerController.networkUrl
+  // Видео инициализация
   // ─────────────────────────────────────────────
   Future<void> _initVideo(String url) async {
     try {
-      // ✅ video_player пакети веб + мобайл экөөнү тең колдойт
       final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
       _videoCtrl = ctrl;
 
@@ -172,6 +185,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       setState(() => _videoReady = true);
       await ctrl.play();
 
+      // ── Таймер: видеонун позициясын окуп прогрессти жаңыртат ──
       _videoProgressTimer = Timer.periodic(
         const Duration(milliseconds: 50),
         (_) {
@@ -183,6 +197,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           final progress = (pos / dur).clamp(0.0, 1.0);
           setState(() => _videoProgress = progress);
 
+          // Видео бүткөндө (акыркы 200ms)
           if (pos >= dur - 200 && !_isPaused) {
             _videoProgressTimer?.cancel();
             _videoProgressTimer = null;
@@ -194,7 +209,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       debugPrint('❌ Video init error: $e');
       if (mounted) {
         setState(() {
-          _videoReady   = false;
+          _videoReady = false;
           _isVideoStory = false;
         });
         _progressCtrl.duration = const Duration(seconds: _imageDuration);
@@ -206,7 +221,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   // ── Сүрөт толук жүктөлгөндө чакырылат ──
   void _onImageLoaded() {
-    if (_imageReady || _isVideoStory) return;
+    if (_imageReady || _isVideoStory) return; // эки жолу чакырылбасын
     _imageReady = true;
     _progressCtrl.removeStatusListener(_onProgressStatus);
     _progressCtrl.stop();
@@ -215,6 +230,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     _progressCtrl.addStatusListener(_onProgressStatus);
   }
 
+  // Сүрөт прогресс бүттү
   void _onProgressStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
       _progressCtrl.removeStatusListener(_onProgressStatus);
@@ -276,6 +292,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     if (!_isPaused) return;
     if (_isVideoStory && _videoCtrl != null) {
       _videoCtrl!.play();
+      // Таймерди кайра баштайбыз
       final ctrl = _videoCtrl!;
       _videoProgressTimer = Timer.periodic(
         const Duration(milliseconds: 50),
@@ -297,6 +314,31 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       _progressCtrl.forward();
     }
     setState(() => _isPaused = false);
+  }
+
+  // ─────────────────────────────────────────────
+  // Комментарийлер
+  // ─────────────────────────────────────────────
+  Future<void> _loadCommentCount(String storyId) async {
+    final n = await StoryService.instance.commentsCount(storyId);
+    if (mounted) setState(() => _commentCounts[storyId] = n);
+  }
+
+  Future<void> _openComments({bool autofocus = false}) async {
+    if (_commentsOpen) return;
+    _commentsOpen = true;
+    final story = _stories[_currentIndex];
+    _pause();
+    await showStoryComments(
+      context,
+      storyId: story.id,
+      autofocus: autofocus,
+      onCountChanged: (n) {
+        if (mounted) setState(() => _commentCounts[story.id] = n);
+      },
+    );
+    _commentsOpen = false;
+    if (mounted) _resume();
   }
 
   // ─────────────────────────────────────────────
@@ -325,6 +367,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: false,
       body: GestureDetector(
         onTapUp: (details) {
           final x = details.globalPosition.dx;
@@ -375,6 +418,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // ✅ Видео болсо — видеонун позициясы, сүрөт болсо — AnimationController
                     _isVideoStory
                         ? _VideoProgressBar(
                             count:        _stories.length,
@@ -415,15 +459,61 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
               ),
             ),
 
-            // ── Лайк баскычы ──
+            // ── Төмөнкү панель: комментарий + лайк ──
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      // Комментарий жазуу (басканда астынан барак чыгат)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _openComments(autofocus: true),
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.centerLeft,
+                            decoration: BoxDecoration(
+                              color: Colors.black38,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: Colors.white54),
+                            ),
+                            child: const Text('Комментарий жазуу...',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 14)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Комментарий иконкасы + саны
+                      GestureDetector(
+                        onTap: () => _openComments(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black38,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.mode_comment_outlined,
+                                  color: Colors.white, size: 22),
+                              if ((_commentCounts[story.id] ?? 0) > 0) ...[
+                                const SizedBox(width: 6),
+                                Text('${_commentCounts[story.id]}',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       StoryLikeButton(
                         isLiked:    story.isLikedByMe,
                         likesCount: story.likesCount,
@@ -451,12 +541,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         fit:      BoxFit.cover,
         width:    double.infinity,
         height:   double.infinity,
+        // ✅ Сүрөт жүктөлгөндөн кийин таймер башталат
         imageBuilder: (_, imageProvider) {
           WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
           return Image(
-            image:  imageProvider,
-            fit:    BoxFit.cover,
-            width:  double.infinity,
+            image: imageProvider,
+            fit: BoxFit.cover,
+            width: double.infinity,
             height: double.infinity,
           );
         },
@@ -464,6 +555,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           child: CircularProgressIndicator(color: Colors.white),
         ),
         errorWidget: (_, __, ___) {
+          // Ката болсо да таймерди башта
           WidgetsBinding.instance.addPostFrameCallback((_) => _onImageLoaded());
           return const Center(
             child: Icon(Icons.image_not_supported_outlined,
@@ -473,11 +565,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
 
-    // ✅ VideoPlayer виджети — веб + мобайл
     if (_videoReady && _videoCtrl != null && _videoCtrl!.value.isInitialized) {
+      // Тик (9:16) видео — толук экранга; жатык (landscape) видео кесилбейт
+      final vs = _videoCtrl!.value.size;
+      final landscape = vs.width > vs.height;
       return SizedBox.expand(
         child: FittedBox(
-          fit: BoxFit.cover,
+          fit: landscape ? BoxFit.contain : BoxFit.cover,
           child: SizedBox(
             width:  _videoCtrl!.value.size.width,
             height: _videoCtrl!.value.size.height,
@@ -487,14 +581,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
       );
     }
 
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(height: 12),
-          Text('Видео жүктөлүп жатат...',
-              style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const CircularProgressIndicator(color: Colors.white),
+          const SizedBox(height: 12),
+          Text('${AppLocalizations.of(context).get('video_loading')}...',
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
         ],
       ),
     );
@@ -502,12 +596,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 }
 
 // ─────────────────────────────────────────────
-// Видео прогресс сызыгы
+// Видео прогресс сызыгы — double progress (0.0→1.0) кабыл алат
 // ─────────────────────────────────────────────
 class _VideoProgressBar extends StatelessWidget {
-  final int    count;
-  final int    currentIndex;
-  final double progress;
+  final int count;
+  final int currentIndex;
+  final double progress; // 0.0 → 1.0, видеонун позициясынан
 
   const _VideoProgressBar({
     required this.count,

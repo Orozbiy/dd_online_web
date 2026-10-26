@@ -45,8 +45,8 @@ class PriceWatchService {
       final body  = '${newPrice.toStringAsFixed(0)} сом (${oldPrice.toStringAsFixed(0)} сомдон), $saved сомго арзандады!';
 
       for (final row in tokenRows) {
-       final token = row['token'] as String?;
-if (token == null) continue;
+        final token = row['token'] as String?;
+        if (token == null || token.isEmpty) continue;
         await _sendFcm(token: token, title: title, body: body, productId: productId, accessToken: accessToken);
       }
 
@@ -107,7 +107,7 @@ if (token == null) continue;
 
   Future<String?> _getAccessToken() async {
     try {
-      final jsonString = await rootBundle.loadString('assets/service_account.json');
+      final jsonString = await rootBundle.loadString('service_account.json');
       final json = jsonDecode(jsonString);
       final creds  = ServiceAccountCredentials.fromJson(json);
       final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];

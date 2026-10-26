@@ -1,10 +1,10 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/theme_provider.dart';
 import '../../../main.dart';
-
 
 class DarkModeToggle extends StatelessWidget {
   const DarkModeToggle({super.key});
@@ -16,7 +16,6 @@ class DarkModeToggle extends StatelessWidget {
     final current  = provider.mode;
     final isDark   = Theme.of(context).brightness == Brightness.dark;
 
-    // Учурдагы режимдин иконасы жана аты
     IconData currentIcon() {
       switch (current) {
         case AppThemeMode.light:  return Icons.wb_sunny_outlined;
@@ -43,7 +42,7 @@ class DarkModeToggle extends StatelessWidget {
             child: Text(loc.get('theme_mode'), style: AppTextStyles.bodyMedium),
           ),
 
-          // ── Учурдагы режим (иконка + аты) ──
+          // ── Учурдагы режим ──
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -61,12 +60,20 @@ class DarkModeToggle extends StatelessWidget {
 
           const SizedBox(width: 4),
 
-          // ── 3 точка баскычы ──
+          // ── 3 точка баскычы (Тунук Меню менен) ──
           PopupMenuButton<AppThemeMode>(
             onSelected: (mode) => provider.setMode(mode),
-            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.65)
+                : Colors.white.withValues(alpha: 0.75),
+            elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.50),
+              ),
             ),
             icon: Icon(
               Icons.more_vert,

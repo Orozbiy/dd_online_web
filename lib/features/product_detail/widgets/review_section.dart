@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
-import '../../../config/theme/app_text_styles.dart';
+
 import '../../../core/app_localizations.dart';
 import '../../../core/utils/review_manager.dart';
 import '../../../core/supabase_client.dart';
@@ -18,6 +18,7 @@ class _ReviewSectionState extends State<ReviewSection> {
   int  _myRating  = 0;
   bool _isLoading = true;
   bool _isSaving  = false;
+  Map<String, dynamic>? _localOverride;
 
   @override
   void initState() {
@@ -28,10 +29,7 @@ class _ReviewSectionState extends State<ReviewSection> {
   Future<void> _loadMyRating() async {
     final r = await _manager.getUserRating(widget.productId);
     if (mounted) {
-      setState(() {
-        _myRating  = r ?? 0;
-        _isLoading = false;
-      });
+      setState(() { _myRating = r ?? 0; _isLoading = false; });
     }
   }
 
@@ -39,29 +37,24 @@ class _ReviewSectionState extends State<ReviewSection> {
     final loc  = AppLocalizations.of(context);
     final user = supabase.auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(loc.get('review_login_required')),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(loc.get('review_login_required')),
+        backgroundColor: AppColors.warning,
+      ));
       return;
     }
-
     setState(() { _myRating = star; _isSaving = true; });
     await _manager.submitRating(productId: widget.productId, rating: star);
-
     if (mounted) {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_starLabel(loc, star)),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      final fresh = await _manager.fetchRatingData(widget.productId);
+      setState(() { _isSaving = false; _localOverride = fresh; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_starLabel(loc, star)),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
     }
   }
 
@@ -80,76 +73,112 @@ class _ReviewSectionState extends State<ReviewSection> {
   Widget build(BuildContext context) {
     final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor     = isDark ? const Color(0xFF2D2040) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF3D3060) : AppColors.grey100;
-    final dividerColor = isDark ? const Color(0xFF3D3060) : AppColors.grey100;
-    final textColor   = isDark ? Colors.white : AppColors.black;
-    final subTextColor = isDark ? AppColors.grey400 : AppColors.grey500;
-    final emptyStarColor = isDark ? AppColors.grey600 : AppColors.grey300;
+
+    final cardBg      = isDark ? const Color(0xFF1C1C2E) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2E2E45) : const Color(0xFFF0F0F0);
+    final subColor    = isDark ? const Color(0xFF8888AA) : const Color(0xFFAAAAAA);
+    final emptyColor  = isDark ? const Color(0xFF444466) : const Color(0xFFDDDDDD);
+    final labelColor  = isDark ? Colors.white : const Color(0xFF1A1A2E);
 
     return StreamBuilder<Map<String, dynamic>>(
       stream: _manager.getRatingStream(widget.productId),
       builder: (context, snapshot) {
-        final data  = snapshot.data ?? {'avg': 0.0, 'count': 0};
+        final data  = _localOverride ?? snapshot.data ?? {'avg': 0.0, 'count': 0};
         final avg   = (data['avg'] as double?) ?? 0.0;
         final count = (data['count'] as int?) ?? 0;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(16),
+            color: cardBg,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: borderColor),
+            boxShadow: isDark ? [] : [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12, offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Жалпы рейтинг ──
+              // ── Жогорку сап: рейтинг + жылдыздар + саны ──
               Row(
                 children: [
-                  Text(
-                    avg > 0 ? avg.toStringAsFixed(1) : '—',
-                    style: const TextStyle(
-                      fontSize: 48, fontWeight: FontWeight.w900,
-                      color: Colors.amber, height: 1,
-                    ),
+                  // Чоң сан
+                  Column(
+                    children: [
+                      if (avg > 0) ...[
+                        Text(
+                          avg.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.amber,
+                            height: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$count ${loc.get('review_count')}',
+                          style: TextStyle(fontSize: 11, color: subColor),
+                        ),
+                      ] else ...[
+                        Icon(Icons.star_outline_rounded,
+                            size: 36, color: subColor),
+                        const SizedBox(height: 4),
+                        Text(
+                          loc.get('review_no_ratings'),
+                          style: TextStyle(fontSize: 11, color: subColor),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: List.generate(5, (i) {
-                          final filled = (i + 1) <= avg.round();
-                          return Icon(
-                            filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: Colors.amber, size: 20,
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        count > 0
-                            ? '$count ${loc.get('review_count')}'
-                            : loc.get('review_no_ratings'),
-                        style: AppTextStyles.bodySmall.copyWith(color: subTextColor),
-                      ),
-                    ],
+                  // Вертикал сызык
+                  Container(width: 1, height: 44, color: borderColor),
+                  const SizedBox(width: 16),
+                  // Жылдыздар + "Баа бер" текст
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Орточо рейтинг жылдыздары (кичи)
+                        Row(
+                          children: List.generate(5, (i) => Icon(
+                            (i + 1) <= avg.round()
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: Colors.amber,
+                            size: 16,
+                          )),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          loc.get('your_rating'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: labelColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 20),
-              Divider(height: 1, color: dividerColor),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
-              // ── Колдонуучунун баасы ──
-              Text(loc.get('your_rating'),
-                  style: AppTextStyles.headingSmall.copyWith(color: textColor)),
-              const SizedBox(height: 12),
-
+              // ── Колдонуучунун жылдыздары ──
               if (_isLoading)
-                const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
+                const SizedBox(
+                  height: 36,
+                  child: Center(child: CircularProgressIndicator(
+                    color: AppColors.primary, strokeWidth: 2,
+                  )),
+                )
               else
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -158,28 +187,46 @@ class _ReviewSectionState extends State<ReviewSection> {
                     final filled = star <= _myRating;
                     return GestureDetector(
                       onTap: _isSaving ? null : () => _onStarTap(star),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                        child: Icon(
-                          filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                          color: filled ? Colors.amber : emptyStarColor,
-                          size: 40,
+                      child: AnimatedScale(
+                        scale: filled ? 1.15 : 1.0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          child: Icon(
+                            filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: filled ? Colors.amber : emptyColor,
+                            size: 34,
+                          ),
                         ),
                       ),
                     );
                   }),
                 ),
 
-              if (_myRating > 0) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    _starLabel(loc, _myRating),
-                    style: AppTextStyles.labelMedium.copyWith(color: Colors.amber),
-                  ),
-                ),
-              ],
+              // ── Тандалган баанын аты ──
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                child: _myRating > 0
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _starLabel(loc, _myRating),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.amber,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
         );

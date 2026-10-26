@@ -75,7 +75,7 @@ class NegotiationBadgeLarge extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Сатуучу менен баа боюнча макулдашса болот',
+                  'Сатуучу менен байланыш ',
                   style: AppTextStyles.labelSmall.copyWith(
                     color: const Color(0xFF388E3C),
                     fontSize: 11,

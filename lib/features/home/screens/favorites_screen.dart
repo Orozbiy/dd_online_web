@@ -1,13 +1,17 @@
 // lib/features/home/screens/favorites_screen.dart
-
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/utils/image_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import '../../../config/theme/app_colors.dart';
+import '../../../config/theme/dd_design.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../../../core/utils/favorites_manager.dart';
 import '../../../data/models/product_model.dart';
 import '../../product_detail/screens/product_detail_screen.dart';
+import '../../store/screens/store_products_screen.dart';
 import '../../../core/supabase_client.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -26,7 +30,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   List<Map<String, dynamic>> _favoriteStores = [];
   bool _storesLoading = false;
 
-  // ── Selection mode ──
   bool _selectionMode = false;
   final Set<String> _selectedIds = {};
 
@@ -46,7 +49,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       if (_tabController.index == 1 && _favoriteStores.isEmpty) {
         _loadFavoriteStores();
       }
-      // Tab алмашканда selection mode өчүр
       setState(() {
         _selectionMode = false;
         _selectedIds.clear();
@@ -183,9 +185,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               onPressed: () {
                 Navigator.pop(context);
                 for (final id in _selectedIds) {
-                  final product = _fav.favorites
-                      .firstWhere((p) => p.id == id,
-                          orElse: () => _fav.favorites.first);
+                  final product = _fav.favorites.firstWhere(
+                    (p) => p.id == id,
+                    orElse: () => _fav.favorites.first,
+                  );
                   _fav.toggle(product);
                 }
                 setState(() {
@@ -219,15 +222,24 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isKy = loc.locale.languageCode == 'ky';
 
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final bgColor = isDark ? DD.bgDark : DD.bgLight;
+    final cardColor = isDark ? const Color(0xFF15120F) : Colors.white;
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: cardColor,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight + 48),
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: AppBar(
+        backgroundColor: isDark
+            ? Colors.black.withOpacity(0.55)
+            : Colors.white.withOpacity(0.65),
         elevation: 0,
         automaticallyImplyLeading: false,
+        foregroundColor: isDark ? Colors.white : AppColors.black,
         title: _selectionMode
             ? Row(children: [
                 GestureDetector(
@@ -242,11 +254,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               ])
             : Text(
                 loc.get('favorites'),
-                style: AppTextStyles.headingSmall,
+                style: AppTextStyles.headingMedium.copyWith(
+                  color: isDark ? Colors.white : AppColors.black,
+                ),
               ),
         actions: _selectionMode
             ? [
-                // Баарын тандоо
                 TextButton(
                   onPressed: _selectAll,
                   child: Text(
@@ -254,12 +267,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                     style: const TextStyle(color: AppColors.primary),
                   ),
                 ),
-                // Өчүрүү
                 IconButton(
-                  onPressed:
-                      _selectedIds.isEmpty ? null : _deleteSelected,
-                  icon: const Icon(Icons.delete_rounded,
-                      color: AppColors.error),
+                  onPressed: _selectedIds.isEmpty ? null : _deleteSelected,
+                  icon: const Icon(Icons.delete_rounded, color: AppColors.error),
                 ),
               ]
             : null,
@@ -268,6 +278,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           child: _buildTabBar(loc, isDark, cardColor),
         ),
       ),
+          ),  // ← BackdropFilter
+        ),    // ← ClipRect
+      ),      // ← PreferredSize
       body: PageView(
         controller: _pageController,
         onPageChanged: (i) => _tabController.animateTo(i),
@@ -279,22 +292,20 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     );
   }
 
-  Widget _buildTabBar(
-      AppLocalizations loc, bool isDark, Color cardColor) {
-    final activeColor = AppColors.primary;
-    final inactiveColor =
-        isDark ? const Color(0xFF888888) : AppColors.grey400;
+  Widget _buildTabBar(AppLocalizations loc, bool isDark, Color cardColor) {
+    final activeColor = DD.accent;
+    final inactiveColor = isDark ? const Color(0xFF888888) : AppColors.grey400;
 
     return Container(
-      color: cardColor,
+      color: Colors.transparent,
       child: TabBar(
         controller: _tabController,
         labelColor: activeColor,
         unselectedLabelColor: inactiveColor,
         indicatorColor: activeColor,
         indicatorWeight: 3,
-        labelStyle: AppTextStyles.labelMedium
-            .copyWith(fontWeight: FontWeight.w600),
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w600),
         unselectedLabelStyle: AppTextStyles.labelMedium,
         tabs: [
           Tab(
@@ -317,8 +328,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                 const SizedBox(width: 6),
                 Text(loc.get('fav_tab_stores')),
                 const SizedBox(width: 6),
-                _countBadge(
-                    _fav.favoriteStoreIds.length, AppColors.info),
+                _countBadge(_fav.favoriteStoreIds.length, AppColors.info),
               ],
             ),
           ),
@@ -333,14 +343,11 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(DD.rPill),
       ),
       child: Text(
         '$count',
-        style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: color),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
@@ -361,8 +368,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       );
     }
 
+    final topPadding = MediaQuery.of(context).padding.top + kToolbarHeight + 48 + 12;
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
+      padding: EdgeInsets.fromLTRB(8, topPadding, 8, 24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.62,
@@ -373,8 +381,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       itemBuilder: (_, i) {
         final product = products[i];
         final isSelected = _selectedIds.contains(product.id);
-        final isDark2 =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark2 = Theme.of(context).brightness == Brightness.dark;
 
         return GestureDetector(
           onTap: () {
@@ -384,15 +391,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) =>
-                        ProductDetailScreen(product: product)),
+                    builder: (_) => ProductDetailScreen(product: product)),
               ).then((_) => setState(() {}));
             }
           },
           onLongPress: () {
-            if (!_selectionMode) {
-              _enterSelectionMode(product.id);
-            }
+            if (!_selectionMode) _enterSelectionMode(product.id);
           },
           child: Stack(
             children: [
@@ -402,16 +406,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: isSelected
-                      ? Border.all(
-                          color: AppColors.primary, width: 2.5)
+                      ? Border.all(color: AppColors.primary, width: 2.5)
                       : null,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: _ProductFavCard(
-                    product: product,
-                    isDark: isDark2,
-                  ),
+                  child: _ProductFavCard(product: product, isDark: isDark2),
                 ),
               ),
 
@@ -427,18 +427,19 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primary
-                          : Colors.white.withValues(alpha: 0.9),
+                          : (isDark2
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : Colors.black.withValues(alpha: 0.08)),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected
                             ? AppColors.primary
-                            : AppColors.grey300,
+                            : (isDark2 ? AppColors.grey400 : AppColors.grey500),
                         width: 2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              Colors.black.withValues(alpha: 0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 4,
                         ),
                       ],
@@ -471,8 +472,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   // БЕТ 2: ДҮКӨНДӨР
   // ══════════════════════════════════════════════════
 
-  Widget _buildStoresTab(
-      AppLocalizations loc, bool isDark, Color cardColor) {
+  Widget _buildStoresTab(AppLocalizations loc, bool isDark, Color cardColor) {
     if (_storesLoading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.primary));
@@ -499,8 +499,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       );
     }
 
+    final topPadding2 = MediaQuery.of(context).padding.top + kToolbarHeight + 48 + 12;
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, topPadding2, 16, 24),
       itemCount: _favoriteStores.length,
       itemBuilder: (_, i) =>
           _buildStoreCard(_favoriteStores[i], isDark, cardColor),
@@ -515,34 +516,56 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     final district = store['district'] as String? ?? '';
     final imageUrl = store['image_url'] as String?;
     final storeId = store['id'] as String;
-    final location =
-        [market, district].where((s) => s.isNotEmpty).join(', ');
+    final location = [market, district].where((s) => s.isNotEmpty).join(', ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(DD.rCard),
+        border: Border.all(
+            color: isDark
+                ? DD.accent2.withValues(alpha: 0.14)
+                : const Color(0xFFF0F0F2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black
-                .withValues(alpha: isDark ? 0.3 : 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StoreProductsScreen(
+                storeId: storeId,
+                shopName: name,
+                containerNumber: '',
+                ownerName: name,
+                avatarUrl: imageUrl,
+              ),
+            ),
+          );
+        },
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(10),
+          // ── CachedNetworkImage менен алмаштырылды ──
           child: imageUrl != null && imageUrl.isNotEmpty
-              ? Image.network(imageUrl,
+              ? CachedNetworkImage(
+                  imageUrl: imageUrl,
                   width: 52,
                   height: 52,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _storePlaceholder())
+                  memCacheWidth: 104,
+                  fadeInDuration: const Duration(milliseconds: 100),
+                  placeholder: (_, __) => _storePlaceholder(),
+                  errorWidget: (_, __, ___) => _storePlaceholder(),
+                )
               : _storePlaceholder(),
         ),
         title: Text(name,
@@ -552,20 +575,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
         subtitle: location.isNotEmpty
             ? Text(location,
                 style: AppTextStyles.labelSmall.copyWith(
-                    color: isDark
-                        ? AppColors.grey500
-                        : AppColors.grey400))
+                    color: isDark ? AppColors.grey500 : AppColors.grey400))
             : null,
         trailing: GestureDetector(
           onTap: () {
             _fav.toggleStore(storeId);
             setState(() {
-              _favoriteStores
-                  .removeWhere((s) => s['id'] == storeId);
+              _favoriteStores.removeWhere((s) => s['id'] == storeId);
             });
           },
           child: const Icon(Icons.favorite_rounded,
-              color: AppColors.error, size: 22),
+              color: Color(0xFFEF4444), size: 22),
         ),
       ),
     );
@@ -576,11 +596,11 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       width: 52,
       height: 52,
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        gradient: DD.accentGradient,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: const Icon(Icons.store_rounded,
-          color: AppColors.primary, size: 26),
+          color: Colors.white, size: 26),
     );
   }
 
@@ -598,14 +618,11 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           children: [
             Icon(icon,
                 size: 80,
-                color:
-                    isDark ? AppColors.grey600 : AppColors.grey300),
+                color: isDark ? AppColors.grey600 : AppColors.grey300),
             const SizedBox(height: 16),
             Text(title,
                 style: AppTextStyles.headingSmall.copyWith(
-                    color: isDark
-                        ? AppColors.grey500
-                        : AppColors.grey400),
+                    color: isDark ? AppColors.grey500 : AppColors.grey400),
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(subtitle,
@@ -619,53 +636,72 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 }
 
 // ══════════════════════════════════════════════════
-// Жөнөкөй товар карточкасы
+// Товар карточкасы — CachedNetworkImage + Cloudinary
 // ══════════════════════════════════════════════════
 class _ProductFavCard extends StatelessWidget {
   final ProductModel product;
   final bool isDark;
 
-  const _ProductFavCard(
-      {required this.product, required this.isDark});
+  const _ProductFavCard({required this.product, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final imageUrl = product.imageUrl;
+    final shimmerColor = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
+    final thumbUrl = toCloudinaryThumb(product.imageUrl, width: 400);
 
     return Container(
       color: cardColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Сүрөт
+          // ── Сүрөт ──
           Expanded(
-         child: (imageUrl.isNotEmpty)
-                ? Image.network(imageUrl,
+            child: product.imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: thumbUrl,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.image_not_supported,
-                            color: AppColors.grey300))
+                    memCacheWidth: 400,
+                    fadeInDuration: const Duration(milliseconds: 150),
+                    placeholder: (_, __) => Container(color: shimmerColor),
+                    errorWidget: (_, __, ___) => Container(
+                      color: shimmerColor,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported_outlined,
+                            color: AppColors.grey400, size: 32),
+                      ),
+                    ),
+                  )
                 : Container(
-                    color: AppColors.grey100,
-                    child: const Icon(Icons.image,
-                        color: AppColors.grey300, size: 40)),
+                    color: shimmerColor,
+                    child: const Center(
+                      child: Icon(Icons.image,
+                          color: AppColors.grey300, size: 40),
+                    ),
+                  ),
           ),
-          // Маалымат
+
+          // ── Маалымат ──
           Padding(
             padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.name,
-                    style: AppTextStyles.labelMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  product.name,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: isDark ? Colors.white : AppColors.black,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
-                Text('${product.price.toStringAsFixed(0)} сом',
-                    style: AppTextStyles.labelLarge.copyWith(
-                        color: AppColors.primary)),
+                Text(
+                  '${product.price.toStringAsFixed(0)} сом',
+                  style: AppTextStyles.labelLarge
+                      .copyWith(color: AppColors.primary),
+                ),
               ],
             ),
           ),

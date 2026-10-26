@@ -3,6 +3,7 @@ class CategoryModel {
   final String name;    // кыргызча
   final String nameRu; // орусча
   final String icon;
+   final String? imagePath;
   final String color;
   final List<SubCategoryModel> subcategories;
 
@@ -11,6 +12,7 @@ class CategoryModel {
     required this.name,
     required this.nameRu,
     required this.icon,
+    this.imagePath,  
     required this.color,
     this.subcategories = const [],
   });
@@ -25,6 +27,7 @@ class CategoryModel {
       // ══════════════════════════════════════════
       const CategoryModel(
         id: '1', name: 'Кийим-кече', nameRu: 'Одежда', icon: '👕', color: 'FF6B6B',
+          imagePath: 'assets/images/categories/clothes.jpg',
         subcategories: [
           SubCategoryModel(id: '1_1', name: 'Баары', nameRu: 'Все', icon: '👕'),
           SubCategoryModel(
@@ -138,7 +141,7 @@ class CategoryModel {
       // 2. БУТ КИЙИМ — subItems кошулду
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '2', name: 'Бут кийим', nameRu: 'Обувь', icon: '👟', color: 'C77DFF',
+        id: '2', name: 'Бут кийим', nameRu: 'Обувь', icon: '👟', color: 'C77DFF',  imagePath: 'assets/images/categories/shoes.jpg',
         subcategories: [
           SubCategoryModel(id: '2_1', name: 'Баары', nameRu: 'Все', icon: '👟'),
           SubCategoryModel(
@@ -180,7 +183,7 @@ class CategoryModel {
       // 3. АКСЕССУАРЛАР
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '3', name: 'Аксессуарлар', nameRu: 'Аксессуары', icon: '👜', color: 'FFD93D',
+        id: '3', name: 'Аксессуарлар', nameRu: 'Аксессуары', icon: '👜', color: 'FFD93D',  imagePath: 'assets/images/categories/accessories.jpg',
         subcategories: [
           SubCategoryModel(id: '3_1', name: 'Баары',            nameRu: 'Все',              icon: '👜'),
           SubCategoryModel(
@@ -213,7 +216,7 @@ class CategoryModel {
       // 4. ЭЛЕКТРОНИКА
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '4', name: 'Электроника', nameRu: 'Электроника', icon: '📱', color: '4895EF',
+        id: '4', name: 'Электроника', nameRu: 'Электроника', icon: '📱', color: '4895EF',  imagePath: 'assets/images/categories/electronics.jpg',
         subcategories: [
           SubCategoryModel(id: '4_1',  name: 'Баары',          nameRu: 'Все',             icon: '📱'),
           SubCategoryModel(id: '4_2',  name: 'Телефондор',     nameRu: 'Телефоны',        icon: '📲'),
@@ -232,7 +235,7 @@ class CategoryModel {
       // 5. ҮЙ БУЮМДАР
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '5', name: 'Үй буюмдар', nameRu: 'Товары для дома', icon: '🏠', color: 'FF922B',
+        id: '5', name: 'Үй буюмдар', nameRu: 'Товары для дома', icon: '🏠', color: 'FF922B',  imagePath: 'assets/images/categories/home.jpg',
         subcategories: [
           SubCategoryModel(id: '5_1',  name: 'Баары',           nameRu: 'Все',             icon: '🏠'),
           SubCategoryModel(id: '5_2',  name: 'Мебель',          nameRu: 'Мебель',          icon: '🛋️'),
@@ -251,7 +254,7 @@ class CategoryModel {
       // 6. ТЕХНИКА
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '6', name: 'Техника', nameRu: 'Бытовая техника', icon: '❄️', color: '52B788',
+        id: '6', name: 'Техника', nameRu: 'Бытовая техника', icon: '❄️', color: '52B788',  imagePath: 'assets/images/categories/appliances.jpg',
         subcategories: [
           SubCategoryModel(id: '6_1', name: 'Баары',            nameRu: 'Все',               icon: '❄️'),
           SubCategoryModel(id: '6_2', name: 'Муздаткыч',        nameRu: 'Холодильник',       icon: ''),
@@ -269,7 +272,7 @@ class CategoryModel {
       // 7. СПОРТ
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '7', name: 'Спорт', nameRu: 'Спорт', icon: '⚽', color: 'FF6B9D',
+        id: '7', name: 'Спорт', nameRu: 'Спорт', icon: '⚽', color: 'FF6B9D',  imagePath: 'assets/images/categories/sport.jpg',
         subcategories: [
           SubCategoryModel(id: '7_1',  name: 'Баары',        nameRu: 'Все',         icon: '⚽'),
           SubCategoryModel(id: '7_2',  name: 'Футбол',       nameRu: 'Футбол',      icon: '⚽'),
@@ -289,7 +292,7 @@ class CategoryModel {
       // 8. БАЛДАР
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '8', name: 'Балдар', nameRu: 'Детские товары', icon: '🧸', color: 'FF6B6B',
+        id: '8', name: 'Балдар', nameRu: 'Детские товары', icon: '🧸', color: 'FF6B6B',  imagePath: 'assets/images/categories/kids.jpg', 
         subcategories: [
           SubCategoryModel(id: '8_1', name: 'Баары',           nameRu: 'Все',             icon: '🧸'),
           SubCategoryModel(id: '8_2', name: 'Оюнчуктар',       nameRu: 'Игрушки',         icon: '🪀'),
@@ -305,7 +308,7 @@ class CategoryModel {
       // 9. СУЛУУЛУК
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '9', name: 'Сулуулук', nameRu: 'Красота', icon: '💄', color: 'C77DFF',
+        id: '9', name: 'Сулуулук', nameRu: 'Красота', icon: '💄', color: 'C77DFF',  imagePath: 'assets/images/categories/beauty.jpg',
         subcategories: [
           SubCategoryModel(id: '9_1', name: 'Баары',            nameRu: 'Все',              icon: '💄'),
           SubCategoryModel(id: '9_4', name: 'Парфюм',           nameRu: 'Парфюм',          icon: '🌸'),
@@ -319,7 +322,7 @@ class CategoryModel {
       // 10. ГИГИЕНА
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '10', name: 'Гигиена', nameRu: 'Гигиена', icon: '🧴', color: '4ECDC4',
+        id: '10', name: 'Гигиена', nameRu: 'Гигиена', icon: '🧴', color: '4ECDC4',  imagePath: 'assets/images/categories/hygiena.jpg',
         subcategories: [
           SubCategoryModel(id: '10_1', name: 'Баары',            nameRu: 'Все',             icon: '🧴'),
           SubCategoryModel(id: '10_2', name: 'Шампунь/Гель',     nameRu: 'Шампунь/Гель',   icon: '🚿'),
@@ -335,7 +338,7 @@ class CategoryModel {
       // 11. АВТОТОВАР  (мурда 12 болчу, Азык-түлүк алынды)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '11', name: 'Автотовар', nameRu: 'Автотовары', icon: '🚗', color: '4895EF',
+        id: '11', name: 'Автотовар', nameRu: 'Автотовары', icon: '🚗', color: '4895EF',imagePath: 'assets/images/categories/auto.jpg',
         subcategories: [
           SubCategoryModel(id: '11_1', name: 'Баары',            nameRu: 'Все',              icon: '🚗'),
           SubCategoryModel(id: '11_2', name: 'Аксессуарлар',     nameRu: 'Аксессуары',       icon: ''),
@@ -352,7 +355,7 @@ class CategoryModel {
       // 12. КИТЕП/КАНЦТОВАР  (мурда 13)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '12', name: 'Китеп/Канцтовар', nameRu: 'Книги/Канцтовары', icon: '📚', color: 'F4A261',
+        id: '12', name: 'Китеп/Канцтовар', nameRu: 'Книги/Канцтовары', icon: '📚', color: 'F4A261',imagePath: 'assets/images/categories/stationery.jpg',
         subcategories: [
           SubCategoryModel(id: '12_1', name: 'Баары',            nameRu: 'Все',              icon: '📚'),
           SubCategoryModel(id: '12_2', name: 'Окуу китептери',   nameRu: 'Учебники',         icon: '📖'),
@@ -368,7 +371,7 @@ class CategoryModel {
       // 13. КЕЗДЕМЕ/ТИГҮҮ  (мурда 14)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '13', name: 'Кездеме/Тигүү', nameRu: 'Ткани/Шитьё', icon: '🧵', color: 'F4A261',
+        id: '13', name: 'Кездеме/Тигүү', nameRu: 'Ткани/Шитьё', icon: '🧵', color: 'F4A261',imagePath: 'assets/images/categories/fabric.jpg',
         subcategories: [
           SubCategoryModel(id: '13_1', name: 'Баары',            nameRu: 'Все',                   icon: '🧵'),
           SubCategoryModel(id: '13_2', name: 'Кездеме/Мата',     nameRu: 'Ткань/Материал',        icon: '🪢'),
@@ -383,7 +386,7 @@ class CategoryModel {
       // 14. КУРАЛДАР  (мурда 15)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '14', name: 'Куралдар', nameRu: 'Инструменты', icon: '🔧', color: '888888',
+        id: '14', name: 'Куралдар', nameRu: 'Инструменты', icon: '🔧', color: '888888',imagePath: 'assets/images/categories/tools.jpg',
         subcategories: [
           SubCategoryModel(id: '14_1', name: 'Баары',             nameRu: 'Все',                icon: '🔧'),
           SubCategoryModel(id: '14_2', name: 'Электр куралдары',  nameRu: 'Электроинструменты', icon: '⚡'),
@@ -399,7 +402,7 @@ class CategoryModel {
       // 15. ОЮН/ЭГЛЕНТҮҮ  (мурда 16)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '15', name: 'Оюн/Эглентүү', nameRu: 'Игры/Развлечения', icon: '🎮', color: 'E63946',
+        id: '15', name: 'Оюн/Эглентүү', nameRu: 'Игры/Развлечения', icon: '🎮', color: 'E63946',imagePath: 'assets/images/categories/games.jpg',
         subcategories: [
           SubCategoryModel(id: '15_1', name: 'Баары',            nameRu: 'Все',                     icon: '🎮'),
           SubCategoryModel(id: '15_2', name: 'Видеооюндар',      nameRu: 'Видеоигры',               icon: '🕹️'),
@@ -414,7 +417,7 @@ class CategoryModel {
       // 16. БАГЧЫЛЫК  (мурда 17)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '16', name: 'Багчылык', nameRu: 'Садоводство', icon: '🪴', color: '6BCB77',
+        id: '16', name: 'Багчылык', nameRu: 'Садоводство', icon: '🪴', color: '6BCB77',imagePath: 'assets/images/categories/garden.jpg',
         subcategories: [
           SubCategoryModel(id: '16_1', name: 'Баары',              nameRu: 'Все',                  icon: '🪴'),
           SubCategoryModel(id: '16_2', name: 'Үй өсүмдүктөрү',    nameRu: 'Комнатные растения',   icon: '🌿'),
@@ -429,7 +432,7 @@ class CategoryModel {
       // 17. ЖАНЫБАРЛАР  (мурда 18)
       // ══════════════════════════════════════════
       const CategoryModel(
-        id: '17', name: 'Жаныбарлар', nameRu: 'Товары для животных', icon: '🐾', color: 'FF922B',
+        id: '17', name: 'Жаныбарлар', nameRu: 'Товары для животных', icon: '🐾', color: 'FF922B',imagePath: 'assets/images/categories/dog.jpg',
         subcategories: [
           SubCategoryModel(id: '17_1', name: 'Баары',          nameRu: 'Все',            icon: '🐾'),
           SubCategoryModel(id: '17_2', name: 'Ит буюмдары',    nameRu: 'Для собак',      icon: '🐕'),

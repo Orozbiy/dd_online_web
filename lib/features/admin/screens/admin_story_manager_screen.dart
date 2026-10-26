@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../config/theme/app_colors.dart';
@@ -61,25 +61,20 @@ class _AdminStoryManagerScreenState extends State<AdminStoryManagerScreen> {
         _uploadStatus = 'Жүктөлүп жатат...';
       });
 
-      File file;
+      // Веб + мобил: File колдонулбайт, байттар менен иштейт
+      final Uint8List data;
 
       if (mediaType == 'image') {
         // ── Сүрөттү оригинал катышта compress кылуу ──
-        final bytes      = await picked.readAsBytes();
-        final compressed = await compressStoryImage(bytes); // ← ОШУ ЖЕР
-
-        // Убактылуу файлга жазуу
-        final tempPath = '${picked.path}_story.jpg';
-        final tempFile = File(tempPath);
-        await tempFile.writeAsBytes(compressed);
-        file = tempFile;
+        final bytes = await picked.readAsBytes();
+        data = await compressStoryImage(bytes);
       } else {
         // Видеону түздөн-түз берүү — катыш өзүнөн сакталат
-        file = File(picked.path);
+        data = await picked.readAsBytes();
       }
 
       final story = await _service.uploadAndCreateStory(
-        file:      file,
+        bytes:     data,
         mediaType: mediaType,
       );
 

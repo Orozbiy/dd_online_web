@@ -49,8 +49,8 @@ class ChatModel {
   }) {
     final productData  = data['products'] as Map<String, dynamic>?;
     final images       = productData?['images'] as List?;
-    final sellerUnread = data['seller_unread'] as int? ?? 0;
-    final buyerUnread  = data['buyer_unread']  as int? ?? 0;
+   final sellerUnread = (data['seller_unread'] as num?)?.toInt() ?? 0;
+final buyerUnread  = (data['buyer_unread']  as num?)?.toInt() ?? 0;
 
     return ChatModel(
       id:           data['id']             as String? ?? '',

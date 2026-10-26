@@ -19,17 +19,20 @@ class SearchBarWidget extends StatefulWidget {
 
 class _SearchBarWidgetState extends State<SearchBarWidget> {
   late TextEditingController _controller;
+  late FocusNode _focusNode;  // ← КОШ
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _focusNode = FocusNode();  // ← КОШ
     _controller.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();  // ← КОШ
     super.dispose();
   }
 
@@ -37,12 +40,19 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
   Widget build(BuildContext context) {
     final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor   = isDark ? const Color(0xFF2C2C2C) : AppColors.grey50;
+    final fillColor   = isDark
+        ? const Color(0xFF2C2C2C).withOpacity(0.55)
+        : AppColors.grey50.withOpacity(0.55);
     final borderColor = isDark ? const Color(0xFF3A3A3A) : AppColors.grey200;
 
     return TextFormField(
       controller: _controller,
+      focusNode: _focusNode,  // ← КОШ
       onChanged: widget.onChanged,
+      // ── Тышка тийгенде клавиатура жабылат ── ← КОШ
+      onTapOutside: (_) {
+        _focusNode.unfocus();
+      },
       style: AppTextStyles.bodyMedium.copyWith(
         color: isDark ? Colors.white : AppColors.black,
       ),
@@ -54,6 +64,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             ? GestureDetector(
                 onTap: () {
                   _controller.clear();
+                  _focusNode.unfocus();  // ← KOШ: тазалагандан кийин жабылат
                   widget.onClear?.call();
                   widget.onChanged('');
                 },

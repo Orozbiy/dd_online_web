@@ -7,6 +7,7 @@ class ReviewManager {
     _instance ??= ReviewManager._internal();
     return _instance!;
   }
+
   ReviewManager._internal();
 
   static const _table = 'reviews';
@@ -73,6 +74,27 @@ class ReviewManager {
     }
   }
 
+  // ── Баалоодон кийин дароо жаңы маанилерди алуу ───────────────────────────
+  Future<Map<String, dynamic>> fetchRatingData(String productId) async {
+    try {
+      final rows = await supabase
+          .from(_table)
+          .select('rating')
+          .eq('product_id', productId);
+      final list = rows as List;
+      if (list.isEmpty) return {'avg': 0.0, 'count': 0};
+      final total = list.fold<double>(
+          0, (sum, row) => sum + ((row['rating'] as num?)?.toDouble() ?? 0));
+      final avg = total / list.length;
+      return {
+        'avg': double.parse(avg.toStringAsFixed(1)),
+        'count': list.length,
+      };
+    } catch (_) {
+      return {'avg': 0.0, 'count': 0};
+    }
+  }
+
   // ── Реалдуу убакытта рейтинг стримы ───────────────────────────────────────
   Stream<Map<String, dynamic>> getRatingStream(String productId) {
     return supabase
@@ -80,16 +102,16 @@ class ReviewManager {
         .stream(primaryKey: ['id'])
         .eq('product_id', productId)
         .map((rows) {
-      if (rows.isEmpty) return {'avg': 0.0, 'count': 0};
-      final total = rows.fold<double>(
-        0,
-        (sum, row) => sum + ((row['rating'] as num?)?.toDouble() ?? 0),
-      );
-      final avg = total / rows.length;
-      return {
-        'avg': double.parse(avg.toStringAsFixed(1)),
-        'count': rows.length,
-      };
-    });
+          if (rows.isEmpty) return {'avg': 0.0, 'count': 0};
+          final total = rows.fold<double>(
+            0,
+            (sum, row) => sum + ((row['rating'] as num?)?.toDouble() ?? 0),
+          );
+          final avg = total / rows.length;
+          return {
+            'avg': double.parse(avg.toStringAsFixed(1)),
+            'count': rows.length,
+          };
+        });
   }
 }

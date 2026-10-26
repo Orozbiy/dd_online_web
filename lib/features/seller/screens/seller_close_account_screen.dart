@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 import 'seller_login_screen.dart';
 
@@ -26,6 +27,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
   }
 
   Future<void> _loadProducts() async {
+    final loc = AppLocalizations.of(context);
     setState(() => _isLoading = true);
     try {
       final store = await supabase.from('stores').select('id').eq('owner_id', widget.sellerUid).maybeSingle();
@@ -38,7 +40,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) _showSnack('Жүктөөдө ката: $e', isError: true);
+      if (mounted) _showSnack('${loc.get('error_loading_generic')}: $e', isError: true);
     }
   }
 
@@ -69,16 +71,17 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
   }
 
   Future<void> _deleteSelected() async {
+    final loc = AppLocalizations.of(context);
     if (_selectedIds.isEmpty) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Товарларды өчүрүү', style: AppTextStyles.headingSmall),
-        content: Text('${_selectedIds.length} товар толугу менен өчүрүлөт. Бул кайтарылгыс. Улантасызбы?', style: AppTextStyles.bodyMedium),
+        title: Text(loc.get('delete_products_title'), style: AppTextStyles.headingSmall),
+        content: Text('${_selectedIds.length} ${loc.get('delete_products_confirm_suffix')}', style: AppTextStyles.bodyMedium),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Жок', style: TextStyle(color: AppColors.grey500))),
-          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text('Ооба, өчүрүү', style: TextStyle(color: AppColors.error))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(loc.get('no'), style: const TextStyle(color: AppColors.grey500))),
+          TextButton(onPressed: () => Navigator.pop(context, true),  child: Text(loc.get('yes_delete'), style: const TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -87,23 +90,24 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
     try {
       await supabase.from('products').delete().inFilter('id', _selectedIds.toList());
       setState(() { _products.removeWhere((p) => _selectedIds.contains(p['id'])); _selectedIds.clear(); _isDeleting = false; });
-      if (mounted) _showSnack('🗑️ Товарлар өчүрүлдү');
+      if (mounted) _showSnack('🗑️ ${loc.get('products_deleted_success')}');
     } catch (e) {
       setState(() => _isDeleting = false);
-      if (mounted) _showSnack('Өчүрүүдө ката: $e', isError: true);
+      if (mounted) _showSnack('${loc.get('error_deleting_generic')}: $e', isError: true);
     }
   }
 
   Future<void> _closeAccount() async {
+    final loc = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Дүкөндөн баш тартуу', style: AppTextStyles.headingSmall),
-        content: const Text('Бардык товарларыңыз толугу менен өчүрүлөт жана аккаунттан чыгасыз. Бул кайтарылгыс. Улантасызбы?', style: AppTextStyles.bodyMedium),
+        title: Text(loc.get('close_store_title'), style: AppTextStyles.headingSmall),
+        content: Text(loc.get('close_account_confirm_body'), style: AppTextStyles.bodyMedium),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Жок', style: TextStyle(color: AppColors.grey500))),
-          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text('Ооба, баш тартам', style: TextStyle(color: AppColors.error))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(loc.get('no'), style: const TextStyle(color: AppColors.grey500))),
+          TextButton(onPressed: () => Navigator.pop(context, true),  child: Text(loc.get('yes_give_up'), style: const TextStyle(color: AppColors.error))),
         ],
       ),
     );
@@ -116,12 +120,13 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const SellerLoginScreen()), (route) => false);
     } catch (e) {
       setState(() => _isDeleting = false);
-      if (mounted) _showSnack('Ката: $e', isError: true);
+      if (mounted) _showSnack('${loc.get('error')}: $e', isError: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark      = Theme.of(context).brightness == Brightness.dark;
     final allSelected = _products.isNotEmpty && _selectedIds.length == _products.length;
 
@@ -147,7 +152,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
           onTap: () => Navigator.pop(context),
           child: Icon(Icons.arrow_back, color: arrowColor),
         ),
-        title: Text('Дүкөндөн баш тартуу',
+        title: Text(loc.get('close_store_title'),
             style: AppTextStyles.headingMedium.copyWith(color: titleColor)),
       ),
       body: _isLoading
@@ -168,7 +173,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                     const Text('⚠️', style: TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
                     Expanded(child: Text(
-                      'Товарларыңызды тандап өчүрө аласыз, же бардыгын өчүрүп аккаунттан баш тарта аласыз.',
+                      loc.get('close_account_warning_body'),
                       style: AppTextStyles.bodyMedium.copyWith(color: warnText),
                     )),
                   ]),
@@ -181,11 +186,11 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                     child: Row(children: [
                       Checkbox(value: allSelected, activeColor: AppColors.primary, onChanged: (_) => _toggleSelectAll()),
                       Text(
-                        allSelected ? 'Баарын алып салуу' : 'Баарын белгилөө',
+                        allSelected ? loc.get('deselect_all') : loc.get('select_all'),
                         style: AppTextStyles.labelLarge.copyWith(color: labelColor),
                       ),
                       const Spacer(),
-                      Text('${_selectedIds.length} тандалды',
+                      Text('${_selectedIds.length} ${loc.get('selected_count_suffix')}',
                           style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
                     ]),
                   ),
@@ -196,7 +201,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                       ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                           const Text('📦', style: TextStyle(fontSize: 64)),
                           const SizedBox(height: 16),
-                          Text('Товар жок', style: AppTextStyles.headingSmall.copyWith(color: labelColor)),
+                          Text(loc.get('no_products_label'), style: AppTextStyles.headingSmall.copyWith(color: labelColor)),
                         ]))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -204,7 +209,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                           itemBuilder: (context, i) {
                             final p          = _products[i];
                             final id         = p['id'] as String;
-                            final name       = p['title'] as String? ?? 'Аты жок';
+                            final name       = p['title'] as String? ?? loc.get('profile_no_name');
                             final price      = (p['price'] as num?)?.toDouble() ?? 0;
                             final inStock    = (p['in_stock'] as num?)?.toInt() ?? 0;
                             final images     = List<String>.from(p['images'] as List? ?? []);
@@ -268,7 +273,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                           ),
                           child: _isDeleting
                               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                              : Text('🗑️ Тандалган товарларды өчүрүү (${_selectedIds.length})',
+                              : Text('🗑️ ${loc.get('delete_selected_products_btn')} (${_selectedIds.length})',
                                   style: AppTextStyles.labelLarge.copyWith(color: Colors.white)),
                         ),
                       ),
@@ -281,7 +286,7 @@ class _SellerCloseAccountScreenState extends State<SellerCloseAccountScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           side: const BorderSide(color: AppColors.error, width: 1.5),
                         ),
-                        child: Text('🚪 Дүкөндөн баш тартуу (баарын өчүрүү)',
+                        child: Text('🚪 ${loc.get('close_account_btn')}',
                             style: AppTextStyles.labelLarge.copyWith(color: AppColors.error)),
                       ),
                     ),

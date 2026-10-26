@@ -138,7 +138,7 @@ class _SuggestionButtonState extends State<SuggestionButton> {
                         style: AppTextStyles.headingSmall),
                     const Spacer(),
                     Text(
-                      'Бүгүн: $_todayCount/$_maxPerDay',
+                      'Бүгүн/Сегодня: $_todayCount/$_maxPerDay',
                       style:
                           AppTextStyles.labelSmall.copyWith(color: Colors.grey),
                     ),

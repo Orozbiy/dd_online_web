@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/product_model.dart';
 import 'product_card.dart';
+import 'equal_height_row.dart';
 
 class ProductGrid extends StatelessWidget {
   final List<ProductModel> products;
@@ -32,43 +33,46 @@ class ProductGrid extends StatelessWidget {
     }
 
     final width = MediaQuery.of(context).size.width;
-    int crossAxisCount;
+    int columns;
     if (width > 1200) {
-      crossAxisCount = 5;
+      columns = 5;
     } else if (width > 900) {
-      crossAxisCount = 4;
+      columns = 4;
     } else if (width > 600) {
-      crossAxisCount = 3;
+      columns = 3;
     } else {
-      crossAxisCount = 2;
+      columns = 2;
     }
 
-    return GridView.builder(
-      // ── Айнек стили үчүн padding: карточкалар тегерек бурчтары
-      //    кесилбесин деп четтерден бираз алыс болсун
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+    const spacing = 12.0;
+    const hPad = 12.0;
+
+    // ── Катардын бийиктиги = ошол катардагы эң узун карта ──
+    // IntrinsicHeight колдонбойбуз (ал бийиктикти ашыкча эсептеп, карта
+    // астында боштук калтырат). Ордуна _EqualHeightRow: карталарды өлчөп,
+    // эң узунун табып, баарын так ошол бийиктикке келтирет.
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(hPad, 8, hPad, 120),
       cacheExtent: MediaQuery.of(context).size.height * 2,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        // ── Айнек карточкалар бираз узунураак — текст + баа үчүн орун
-        childAspectRatio: 0.62,
-        // ── Айнек shadow кесилбесин деп боштук кеңейтилди
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      ),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final product = products[index];
-        return RepaintBoundary(
-          key: ValueKey(product.id),
-          // ── Айнек карточканын shadow'су кесилбесин деп
-          //    ар бир элементти Padding менен ороп коёбуз
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: ProductCard(
-              product: product,
-              onTap: () => onProductTap(product),
-            ),
+      itemCount: (products.length / columns).ceil(),
+      itemBuilder: (context, rowIndex) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: spacing),
+          child: EqualHeightRow(
+            spacing: spacing,
+            children: [
+              for (var col = 0; col < columns; col++)
+                rowIndex * columns + col < products.length
+                    ? RepaintBoundary(
+                        key: ValueKey(products[rowIndex * columns + col].id),
+                        child: ProductCard(
+                          product: products[rowIndex * columns + col],
+                          onTap: () => onProductTap(
+                              products[rowIndex * columns + col]),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+            ],
           ),
         );
       },

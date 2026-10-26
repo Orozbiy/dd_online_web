@@ -65,6 +65,10 @@ class AppTheme {
     ),
   );
 
+  // Баскычтар тезирээк сезилиши үчүн: InkRipple дароо (тийгенде эле)
+  // чоңоюп баштайт — M3'тин демейки InkSparkle'ынан бир топ тез сезилет
+  static const _fastSplash = InkRipple.splashFactory;
+
   // ── Жарык теma ──────────────────────────────────────────────
   static ThemeData get lightTheme => ThemeData(
         useMaterial3: true,
@@ -72,6 +76,7 @@ class AppTheme {
         primaryColor: AppColors.primary,
         scaffoldBackgroundColor: AppColors.white,
         colorScheme: _colorSchemeLight,
+        splashFactory: _fastSplash,
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.white,
           foregroundColor: AppColors.black,
@@ -96,6 +101,7 @@ class AppTheme {
         primaryColor: AppColors.primary,
         scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: _colorSchemeDark,
+        splashFactory: _fastSplash,
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E1E1E),
           foregroundColor: Colors.white,

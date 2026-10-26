@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../config/theme/app_colors.dart';
@@ -7,7 +10,7 @@ import '../../../core/app_localizations.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/supabase_client.dart';
 import '../../home/models/category_model.dart';
-import '../screens/flash_sale_manage_screen.dart';
+
 import '../../../core/services/yandex_storage_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -147,7 +150,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     }
   }
 
-
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -202,6 +204,171 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ката чыкты: $e'), backgroundColor: AppColors.error));
     }
+  }
+
+  // ── Акция: товар тандоо sheet ─────────────────────────────────────────────
+  void _showProductPickerForDiscount() {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final titleColor = isDark ? Colors.white : AppColors.black;
+    String query = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: sheetBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        builder: (_, scrollCtrl) => StatefulBuilder(builder: (ctx, setSheet) {
+          final filtered = _products.where((p) =>
+              ((p['title'] as String?) ?? '').toLowerCase().contains(query.toLowerCase().trim())).toList();
+          return Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.grey300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.local_offer_rounded, color: Colors.orange, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Акция кошуу', style: AppTextStyles.headingSmall.copyWith(color: titleColor)),
+                    Text('Товарды тандаңыз', style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+                  ]),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: TextField(
+                onChanged: (v) => setSheet(() => query = v),
+                decoration: InputDecoration(
+                  hintText: 'Товар издөө...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            Divider(height: 1, color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE)),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Text('📦', style: TextStyle(fontSize: 48)),
+                        const SizedBox(height: 12),
+                        Text('Товарлар жок', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey500)),
+                      ]),
+                    )
+                  : ListView.builder(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) {
+                        final p = filtered[i];
+                        final images = List<String>.from(p['images'] as List? ?? []);
+                        final imageUrl = images.isNotEmpty ? images.first : '';
+                        final hasDiscount = (p['discount_percent'] as num? ?? 0) > 0;
+                        final discPct = p['discount_percent'];
+
+                        return InkWell(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showDiscountSheet(p);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: SizedBox(
+                                  width: 56, height: 56,
+                                  child: imageUrl.isNotEmpty
+                                      ? Image.network(imageUrl, fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0),
+                                            child: const Center(child: Text('📦', style: TextStyle(fontSize: 22))),
+                                          ))
+                                      : Container(
+                                          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0),
+                                          child: const Center(child: Text('📦', style: TextStyle(fontSize: 22))),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(p['title'] as String? ?? '',
+                                    style: AppTextStyles.labelLarge.copyWith(color: titleColor),
+                                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? 0} с',
+                                      style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                                  if (hasDiscount) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text('-$discPct%',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ]),
+                              ])),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  hasDiscount ? 'Өзгөртүү' : '+ Кошуу',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: Colors.orange, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+          );
+        }),
+      ),
+    );
   }
 
   void _showDiscountSheet(Map<String, dynamic> product) {
@@ -312,14 +479,12 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     _loadProducts();
   }
 
-  /// category_id боюнча аталышты кайтарат (3-деңгээлди да колдойт)
   String _getCategoryName(String id) {
     if (id.isEmpty) return '📦 Башка';
     final parts  = id.split('_');
     final mainId = parts[0];
     try {
       final cat = _allCategories.firstWhere((c) => c.id == mainId);
-      // 3-деңгээл: 1_2_1
       if (parts.length >= 3) {
         final subId  = '${parts[0]}_${parts[1]}';
         final itemId = id;
@@ -329,7 +494,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           return '${cat.icon} ${cat.name} › ${sub.icon} ${sub.name} › ${item.icon} ${item.name}';
         } catch (_) {}
       }
-      // 2-деңгээл: 1_2
       if (parts.length == 2) {
         try {
           final sub = cat.subcategories.firstWhere((s) => s.id == id);
@@ -362,17 +526,60 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
       appBar: AppBar(
         backgroundColor: appBarColor,
         elevation: 0,
+        centerTitle: false,
         iconTheme: IconThemeData(color: isDark ? Colors.white : AppColors.grey600),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(loc.get('my_products'), style: AppTextStyles.headingSmall.copyWith(color: titleColor)),
-          Text(widget.shopName, style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
+          Text(widget.shopName, style: AppTextStyles.labelSmall.copyWith(color: isDark ? Colors.white60 : AppColors.grey500)),
         ]),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlashSaleManageScreen())),
-            icon: const Icon(Icons.bolt_rounded, color: Colors.orange),
-            tooltip: 'Flash Sale',
+          // ── Акция кнопкасы ──
+          GestureDetector(
+            onTap: () => _showProductPickerForDiscount(),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.orange, width: 1.5),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.local_offer_rounded, color: Colors.orange, size: 14),
+                  const SizedBox(width: 4),
+                  Text('Акция', style: AppTextStyles.labelSmall.copyWith(color: Colors.orange, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
           ),
+          // ── Убактылуу акция кнопкасы ──
+          GestureDetector(
+            onTap: () async {
+              final sid = await _getOrCreateStoreId();
+              if (!mounted) return;
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => SellerFlashSaleScreen(storeId: sid),
+              ));
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt_rounded, color: Colors.white, size: 14),
+                  const SizedBox(width: 4),
+                  Text('Вр. акция', style: AppTextStyles.labelSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          // ── Жаңыртуу ──
           IconButton(
             onPressed: _loadProducts,
             icon: Icon(Icons.refresh, color: isDark ? Colors.white70 : AppColors.grey600),
@@ -382,7 +589,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
       ),
       body: Column(
         children: [
-          // ── Категория фильтр ──
           Container(
             color: catBarColor,
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -411,8 +617,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
             ),
           ),
           Divider(height: 1, color: divColor),
-
-          // ── Товарлар тизмеси ──
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -448,34 +652,35 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
                                 boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
                               ),
                               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                GestureDetector(
-                                  onTap: () => _showDiscountSheet(p),
-                                  child: Stack(children: [
-                                    SizedBox(
-                                      width: 80, height: 80,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: imageUrl.isNotEmpty
-                                            ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _noImage(isDark))
-                                            : _noImage(isDark),
+                                Stack(children: [
+                                  SizedBox(
+                                    width: 80, height: 80,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: imageUrl.isNotEmpty
+                                          ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _noImage(isDark))
+                                          : _noImage(isDark),
+                                    ),
+                                  ),
+                                  if ((p['discount_percent'] as num? ?? 0) > 0)
+                                    Positioned(top: 2, left: 2,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
+                                        child: Text('-${p['discount_percent']}%', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
-                                    if ((p['discount_percent'] as num? ?? 0) > 0)
-                                      Positioned(top: 2, left: 2,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(6)),
-                                          child: Text('-${p['discount_percent']}%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ),
-                                  ]),
-                                ),
+                                ]),
                                 const SizedBox(width: 12),
                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Text(p['title'] as String? ?? '', style: AppTextStyles.labelLarge.copyWith(color: prodNameColor), maxLines: 2, overflow: TextOverflow.ellipsis),
                                   const SizedBox(height: 4),
-                                  Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? 0} ${loc.get('currency')}',
-                                      style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                                  Row(children: [
+                                    Text('${(p['price'] as num?)?.toStringAsFixed(0) ?? 0} ${loc.get('currency')}',
+                                        style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary)),
+                                    const SizedBox(width: 6),
+                                    _pricingBadge(p, loc, isDark),
+                                  ]),
                                   const SizedBox(height: 2),
                                   Text(_getCategoryName(p['category_id'] as String? ?? ''),
                                       style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey500)),
@@ -557,7 +762,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(color: isSelected ? Colors.white.withValues(alpha: 0.25) : AppColors.grey300, borderRadius: BorderRadius.circular(10)),
-            child: Text('$count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : AppColors.grey600)),
+            child: Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : AppColors.grey600)),
           ),
         ]),
       ),
@@ -568,21 +773,25 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     final loc    = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final nameCtrl   = TextEditingController(text: existing?['title'] ?? '');
-    final priceCtrl  = TextEditingController(text: existing?['price']?.toString() ?? '');
-    final descCtrl   = TextEditingController(text: existing?['description'] ?? '');
-    final stockCtrl  = TextEditingController(text: existing?['in_stock']?.toString() ?? '');
-    final extra1Ctrl = TextEditingController(text: existing?['extra1'] ?? '');
-    final extra2Ctrl = TextEditingController(text: existing?['extra2'] ?? '');
-    final extra3Ctrl = TextEditingController(text: existing?['extra3'] ?? '');
+    final nameCtrl         = TextEditingController(text: existing?['title'] ?? '');
+    final priceCtrl        = TextEditingController(text: existing?['price']?.toString() ?? '');
+    final wholesalePriceCtrl = TextEditingController(text: existing?['wholesale_price']?.toString() ?? '');
+    final descCtrl         = TextEditingController(text: existing?['description'] ?? '');
+    final stockCtrl        = TextEditingController(text: existing?['in_stock']?.toString() ?? '');
+    final extra1Ctrl       = TextEditingController(text: existing?['extra1'] ?? '');
+    final extra2Ctrl       = TextEditingController(text: existing?['extra2'] ?? '');
+    final extra3Ctrl       = TextEditingController(text: existing?['extra3'] ?? '');
 
-    // ── Учурдагы category_id'ди бөлүп алуу ──
+    // ── Баа тиби state ──
+    String pricingType    = existing?['pricing_type'] as String? ?? 'retail';
+    String wholesaleMode  = existing?['wholesale_mode'] as String? ?? 'price';
+
     final existingCatId = existing?['category_id'] as String? ?? '1';
     final existingParts = existingCatId.split('_');
 
     String  selectedMainCatId  = existingParts[0];
-    String? selectedSubCatId;   // 2-деңгээл: '1_2'
-    String? selectedSubItemId;  // 3-деңгээл: '1_2_3'
+    String? selectedSubCatId;
+    String? selectedSubItemId;
 
     bool mainCatExists = false;
     try { _allCategories.firstWhere((c) => c.id == selectedMainCatId); mainCatExists = true; } catch (_) {}
@@ -598,11 +807,12 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     List<String> selectedColors = List<String>.from(existing?['colors'] ?? []);
     List<String> selectedSizes  = List<String>.from(existing?['sizes']  ?? []);
 
-    Uint8List? imageBytes;
-    final existingImages    = List<String>.from(existing?['images'] as List? ?? []);
-    String existingImageUrl = existingImages.isNotEmpty ? existingImages.first : '';
-    bool isUploading   = false;
-    bool isLoading     = false;
+    // ── ӨЗГӨРТҮҮ 1: 3 сүрөт слоту үчүн state ──
+    final existingImages = List<String>.from(existing?['images'] as List? ?? []);
+    while (existingImages.length < 3) existingImages.add('');
+    final List<Uint8List?> newImageBytes = [null, null, null];
+    bool isUploading  = false;
+    bool isLoading    = false;
     String uploadStatus = '';
 
     final dialogBg  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -612,9 +822,7 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     final hintClr   = isDark ? const Color(0xFF666666) : AppColors.grey400;
     final dropBg    = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
 
-    // ── Размер тизмесин кайтарат (3-деңгээлди эске алат) ──
     List<String> sizesForCategory(String mainId, [String? subId, String? subItemId]) {
-      // SubItem IDине жараша (1_2_X = эркектер + мезгил, бирок размер бирдей)
       if (subId != null) {
         switch (subId) {
           case '1_2': return _menClothSizes;
@@ -632,7 +840,6 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
       }
     }
 
-    // ── Размер Label кайтарат ──
     String sizeLabelForCategory(String mainId, [String? subId, String? subItemId]) {
       if (subId != null) {
         switch (subId) {
@@ -655,135 +862,105 @@ class _SellerProductScreenState extends State<SellerProductScreen> {
     bool hasBeautyFields(String mainId) => ['9', '10'].contains(mainId);
     bool hasAutoFields(String mainId)   => mainId == '12';
 
+    // ── ӨЗГӨРТҮҮ 2: pickImage — idx параметри менен ──
+    Future<void> pickImage(int idx, StateSetter setD) async {
+      if (kIsWeb) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: dialogBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: const EdgeInsets.all(16),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                title: Text('📷  ${loc.get('prod_img_camera')}',
+                    style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final picked = await ImagePicker().pickImage(
+                      source: ImageSource.camera,
+                      maxWidth: 1200, maxHeight: 1200, imageQuality: 85,
+                    );
+                    if (picked == null) return;
+                    final bytes = await picked.readAsBytes();
+                    if (bytes.isNotEmpty) setD(() => newImageBytes[idx] = bytes);
+                  } catch (e) {
+                    _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                title: Text('🖼️  ${loc.get('prod_img_gallery')}',
+                    style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final picked = await ImagePicker().pickImage(
+                      source: ImageSource.gallery,
+                      maxWidth: 1200, maxHeight: 1200, imageQuality: 85,
+                    );
+                    if (picked == null) return;
+                    final bytes = await picked.readAsBytes();
+                    if (bytes.isNotEmpty) setD(() => newImageBytes[idx] = bytes);
+                  } catch (e) {
+                    _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+                  }
+                },
+              ),
+            ]),
+          ),
+        );
+        return;
+      }
 
-
-
-
-
-
-
-
-
-Future<void> pickImage(StateSetter setD) async {
-  if (kIsWeb) {
-    // ВЕБ: 2 баскыч — камера жана галерея өзүнчө иштейт
-    // Dialog жок — Blob өчпөйт
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
+      // МОБАЙЛ
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
         backgroundColor: dialogBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(16),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-
-          // ── КАМЕРА ──
-          ListTile(
-            leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-            title: Text('📷  ${loc.get('prod_img_camera')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () async {
-              Navigator.pop(ctx); // диалогду жап
-              try {
-                final picker = ImagePicker();
-                final picked = await picker.pickImage(
-                  source: ImageSource.camera,
-                  maxWidth: 1200,
-                  maxHeight: 1200,
-                  imageQuality: 85,
-                );
-                if (picked == null) return;
-                final bytes = await picked.readAsBytes();
-                if (bytes.isNotEmpty) setD(() => imageBytes = bytes);
-              } catch (e) {
-                _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
-              }
-            },
-          ),
-
-          // ── ГАЛЕРЕЯ ──
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-            title: Text('🖼️  ${loc.get('prod_img_gallery')}',
-                style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-            onTap: () async {
-              Navigator.pop(ctx); // диалогду жап
-              try {
-                final picker = ImagePicker();
-                final picked = await picker.pickImage(
-                  source: ImageSource.gallery,
-                  maxWidth: 1200,
-                  maxHeight: 1200,
-                  imageQuality: 85,
-                );
-                if (picked == null) return;
-                final bytes = await picked.readAsBytes();
-                if (bytes.isNotEmpty) setD(() => imageBytes = bytes);
-              } catch (e) {
-                _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
-              }
-            },
-          ),
-        ]),
-      ),
-    );
-    return;
-  }
-
-  // МОБИЛ — өзгөртүүсүз
-  final source = await showModalBottomSheet<ImageSource>(
-    context: context,
-    backgroundColor: dialogBg,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (ctx) => SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 8),
-        Container(width: 40, height: 4,
-            decoration: BoxDecoration(
-                color: AppColors.grey300,
-                borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: 12),
-        ListTile(
-          leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-          title: Text('📷  ${loc.get('prod_img_camera')}',
-              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-          onTap: () => Navigator.pop(ctx, ImageSource.camera),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (ctx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: AppColors.grey300, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+              title: Text('📷  ${loc.get('prod_img_camera')}',
+                  style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              title: Text('🖼️  ${loc.get('prod_img_gallery')}',
+                  style: AppTextStyles.labelLarge.copyWith(color: textColor)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ]),
         ),
-        ListTile(
-          leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-          title: Text('🖼️  ${loc.get('prod_img_gallery')}',
-              style: AppTextStyles.labelLarge.copyWith(color: textColor)),
-          onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-        ),
-        const SizedBox(height: 8),
-      ]),
-    ),
-  );
-
-  if (source == null) return;
-
-  try {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source);
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
-    if (bytes.isNotEmpty) setD(() => imageBytes = bytes);
-  } catch (e) {
-    _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
-  }
-}
-
-
-
-
-
-
-
-
-
+      );
+      if (source == null) return;
+      try {
+        final picked = await ImagePicker().pickImage(
+          source: source,
+          maxWidth: 1200, maxHeight: 1200, imageQuality: 85,
+        );
+        if (picked != null) {
+          final bytes = await picked.readAsBytes();
+          if (bytes.isNotEmpty) setD(() => newImageBytes[idx] = bytes);
+        }
+      } catch (e) {
+        _showSnack('${loc.get('prod_img_pick_error')}: $e', isError: true);
+      }
+    }
 
     await showDialog(
       context: context,
@@ -794,7 +971,6 @@ Future<void> pickImage(StateSetter setD) async {
           final selectedSub  = selectedSubCatId != null
               ? mainCat.subcategories.where((s) => s.id == selectedSubCatId).firstOrNull
               : null;
-          // Эффективдүү category_id: 3-деңгээл > 2-деңгээл > 1-деңгээл
           final effectiveCatId = selectedSubItemId ?? selectedSubCatId ?? selectedMainCatId;
 
           Widget labelW(String text) => Padding(
@@ -815,7 +991,6 @@ Future<void> pickImage(StateSetter setD) async {
                 ),
               );
 
-          // ── Dropdown жардамчы функциясы ──
           Widget dropdownW({required String? value, required List<DropdownMenuItem<String?>> items, required ValueChanged<String?> onChanged, required String hint}) =>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -835,7 +1010,6 @@ Future<void> pickImage(StateSetter setD) async {
             child: Container(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92, maxWidth: 520),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                // ── Баш ──
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: const BoxDecoration(
@@ -856,23 +1030,104 @@ Future<void> pickImage(StateSetter setD) async {
                   padding: const EdgeInsets.all(18),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-                    // ── Сүрөт ──
-                    labelW(loc.get('prod_field_image')),
-                    GestureDetector(
-                      onTap: () => pickImage(setD),
-                      child: Container(
-                        width: double.infinity, height: 160,
-                        decoration: BoxDecoration(
-                          color: fieldFill, borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: imageBytes != null || existingImageUrl.isNotEmpty ? AppColors.primary : AppColors.grey300, width: 1.5),
-                        ),
-                        child: imageBytes != null
-                            ? ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.memory(imageBytes!, fit: BoxFit.cover))
-                            : existingImageUrl.isNotEmpty
-                                ? ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.network(existingImageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _uploadPlaceholder(loc)))
-                                : _uploadPlaceholder(loc),
-                      ),
+                    // ── ӨЗГӨРТҮҮ 3: 3 сүрөт слоту UI ──
+                   labelW(loc.get('prod_field_image')),
+const SizedBox(height: 6),
+Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: List.generate(3, (i) {
+    final hasNew      = newImageBytes[i] != null;
+    final hasExisting = existingImages[i].isNotEmpty;
+    final isFirst     = i == 0;
+    final borderClr   = hasNew || hasExisting
+        ? AppColors.primary
+        : (isFirst
+            ? const Color(0xFFEF4444).withValues(alpha: 0.5)
+            : AppColors.grey300);
+
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(right: i < 2 ? 8.0 : 0.0),
+        child: GestureDetector(
+          onTap: () => pickImage(i, setD),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SizedBox(
+                width: double.infinity,   // ← бүтүн туурасы
+                height: 110,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: fieldFill,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: borderClr, width: 1.5),
+                  ),
+                  child: hasNew
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
+                          child: Image.memory(newImageBytes[i]!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity),
+                        )
+                      : hasExisting
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: Image.network(existingImages[i],
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (_, __, ___) =>
+                                      _miniPlaceholder(isFirst)),
+                            )
+                          : _miniPlaceholder(isFirst),
+                ),
+              ),
+              // Номер белгиси
+              Positioned(
+                top: 5, left: 5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (hasNew || hasExisting)
+                        ? AppColors.primary
+                        : (isFirst ? const Color(0xFFEF4444) : AppColors.grey400),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    isFirst ? '1 *' : '${i + 1}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              // Жок кылуу баскычы
+              if (hasNew || hasExisting)
+                Positioned(
+                  top: 4, right: 4,
+                  child: GestureDetector(
+                    onTap: () => setD(() {
+                      newImageBytes[i] = null;
+                      existingImages[i] = '';
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                          color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.close,
+                          size: 12, color: Colors.white),
                     ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }),
+),
                     if (isUploading) ...[
                       const SizedBox(height: 8),
                       const LinearProgressIndicator(color: AppColors.primary),
@@ -881,19 +1136,170 @@ Future<void> pickImage(StateSetter setD) async {
                     ],
                     const SizedBox(height: 14),
 
-                    // ── Товар аты ──
                     labelW(loc.get('prod_field_name')),
                     fieldW(nameCtrl, loc.get('prod_hint_name')),
                     const SizedBox(height: 14),
 
-                    // ── Баасы ──
-                    labelW(loc.get('prod_field_price')),
-                    fieldW(priceCtrl, loc.get('prod_hint_price'), type: TextInputType.number),
+                    // ── PRICING TYPE SELECTOR ──
+                    labelW(loc.get('pricing_type_label')),
+                    Row(children: [
+                      Expanded(child: GestureDetector(
+                        onTap: () => setD(() => pricingType = 'retail'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: pricingType == 'retail'
+                                ? AppColors.primary
+                                : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: pricingType == 'retail' ? AppColors.primary : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(children: [
+                            Icon(Icons.person_rounded,
+                                color: pricingType == 'retail' ? Colors.white : (isDark ? Colors.white60 : AppColors.grey500),
+                                size: 20),
+                            const SizedBox(height: 4),
+                            Text(loc.get('pricing_retail'),
+                                style: TextStyle(
+                                  color: pricingType == 'retail' ? Colors.white : (isDark ? Colors.white60 : AppColors.grey600),
+                                  fontWeight: FontWeight.w700, fontSize: 13)),
+                          ]),
+                        ),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: GestureDetector(
+                        onTap: () => setD(() => pricingType = 'wholesale'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: pricingType == 'wholesale'
+                                ? const Color(0xFF7C3AED)
+                                : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: pricingType == 'wholesale' ? const Color(0xFF7C3AED) : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(children: [
+                            Icon(Icons.store_rounded,
+                                color: pricingType == 'wholesale' ? Colors.white : (isDark ? Colors.white60 : AppColors.grey500),
+                                size: 20),
+                            const SizedBox(height: 4),
+                            Text(loc.get('pricing_wholesale'),
+                                style: TextStyle(
+                                  color: pricingType == 'wholesale' ? Colors.white : (isDark ? Colors.white60 : AppColors.grey600),
+                                  fontWeight: FontWeight.w700, fontSize: 13)),
+                          ]),
+                        ),
+                      )),
+                    ]),
                     const SizedBox(height: 14),
 
-                    // ══════════════════════════════════════════
-                    // 1-ДЕҢГЭЭЛ: Негизги категория
-                    // ══════════════════════════════════════════
+                    // ── RETAIL: баасын жаз ──
+                    if (pricingType == 'retail') ...[
+                      labelW(loc.get('pricing_retail_price_label')),
+                      fieldW(priceCtrl, loc.get('pricing_hint_retail'), type: TextInputType.number),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // ── WHOLESALE: Kelishim же Baasy ──
+                    if (pricingType == 'wholesale') ...[
+                      labelW(loc.get('pricing_wholesale_mode_label')),
+                      Row(children: [
+                        Expanded(child: GestureDetector(
+                          onTap: () => setD(() => wholesaleMode = 'price'),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: wholesaleMode == 'price'
+                                  ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                                  : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7)),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: wholesaleMode == 'price' ? const Color(0xFF7C3AED) : (isDark ? const Color(0xFF3C3C3C) : const Color(0xFFE0E0E0)),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Icon(Icons.price_change_outlined,
+                                  color: wholesaleMode == 'price' ? const Color(0xFF7C3AED) : (isDark ? Colors.white54 : AppColors.grey500),
+                                  size: 16),
+                              const SizedBox(width: 6),
+                              Text(loc.get('pricing_wholesale_by_price'),
+                                  style: TextStyle(
+                                    color: wholesaleMode == 'price' ? const Color(0xFF7C3AED) : (isDark ? Colors.white60 : AppColors.grey600),
+                                    fontWeight: FontWeight.w600, fontSize: 12)),
+                            ]),
+                          ),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: GestureDetector(
+                          onTap: () => setD(() => wholesaleMode = 'negotiation'),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: wholesaleMode == 'negotiation'
+                                  ? const Color(0xFF059669).withValues(alpha: 0.12)
+                                  : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7)),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: wholesaleMode == 'negotiation' ? const Color(0xFF059669) : (isDark ? const Color(0xFF3C3C3C) : const Color(0xFFE0E0E0)),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Icon(Icons.handshake_outlined,
+                                  color: wholesaleMode == 'negotiation' ? const Color(0xFF059669) : (isDark ? Colors.white54 : AppColors.grey500),
+                                  size: 16),
+                              const SizedBox(width: 6),
+                              Text(loc.get('pricing_wholesale_by_negotiation'),
+                                  style: TextStyle(
+                                    color: wholesaleMode == 'negotiation' ? const Color(0xFF059669) : (isDark ? Colors.white60 : AppColors.grey600),
+                                    fontWeight: FontWeight.w600, fontSize: 12)),
+                            ]),
+                          ),
+                        )),
+                      ]),
+                      const SizedBox(height: 12),
+
+                      // Базалык баа — negotiation болсо жашырылат
+                      if (wholesaleMode != 'negotiation') ...[
+                        labelW(loc.get('pricing_retail_price_label')),
+                        fieldW(priceCtrl, loc.get('pricing_hint_retail'), type: TextInputType.number),
+                        const SizedBox(height: 10),
+                      ],
+
+                      if (wholesaleMode == 'price') ...[
+                        labelW(loc.get('pricing_wholesale_price_label')),
+                        fieldW(wholesalePriceCtrl, loc.get('pricing_hint_wholesale'), type: TextInputType.number),
+                        const SizedBox(height: 10),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0D1F18) : const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4)),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.handshake_outlined, color: Color(0xFF059669), size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(loc.get('pricing_negotiation_hint'),
+                                style: AppTextStyles.labelSmall.copyWith(color: const Color(0xFF059669)))),
+                          ]),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ],
+
                     labelW(loc.get('prod_field_main_cat')),
                     dropdownW(
                       value: selectedMainCatId,
@@ -914,9 +1320,6 @@ Future<void> pickImage(StateSetter setD) async {
                     ),
                     const SizedBox(height: 14),
 
-                    // ══════════════════════════════════════════
-                    // 2-ДЕҢГЭЭЛ: Орто категория (Эркектер / Аялдар / Балдар ...)
-                    // ══════════════════════════════════════════
                     if (mainCat.subcategories.isNotEmpty) ...[
                       labelW(loc.get('prod_field_sub_cat')),
                       dropdownW(
@@ -950,10 +1353,6 @@ Future<void> pickImage(StateSetter setD) async {
                       const SizedBox(height: 14),
                     ],
 
-                    // ══════════════════════════════════════════
-                    // 3-ДЕҢГЭЭЛ: Кичи категория (Жазкы / Жайкы / Күзгү ...)
-                    // Subcategory тандалганда жана subItems бар болсо гана чыгат
-                    // ══════════════════════════════════════════
                     if (selectedSub != null && selectedSub.hasSubItems) ...[
                       labelW('${selectedSub.icon} ${selectedSub.name} — ${loc.locale.languageCode == 'ru' ? 'Раздел' : 'Бөлүм'}'),
                       dropdownW(
@@ -979,7 +1378,6 @@ Future<void> pickImage(StateSetter setD) async {
                       const SizedBox(height: 14),
                     ],
 
-                    // ── Тандалган категория жолу (breadcrumb) ──
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
@@ -992,45 +1390,38 @@ Future<void> pickImage(StateSetter setD) async {
                     ),
                     const SizedBox(height: 14),
 
-                    // ── Түстөр ──
                     if (hasColors(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_colors')),
                       _colorPicker(selectedColors, setD, isDark, loc),
                       const SizedBox(height: 14),
                     ],
 
-                    // ── Размерлер ──
                     if (hasSizes(selectedMainCatId)) ...[
                       labelW(sizeLabelForCategory(selectedMainCatId, selectedSubCatId, selectedSubItemId)),
                       _sizePicker(sizesForCategory(selectedMainCatId, selectedSubCatId, selectedSubItemId), selectedSizes, setD, isDark),
                       const SizedBox(height: 14),
                     ],
 
-                    // ── Техника талаалары ──
                     if (hasTechFields(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_brand')), fieldW(extra1Ctrl, loc.get('prod_hint_brand_tech')), const SizedBox(height: 14),
                       labelW(loc.get('prod_field_model')), fieldW(extra2Ctrl, loc.get('prod_hint_model')),      const SizedBox(height: 14),
                       labelW(loc.get('prod_field_spec')),  fieldW(extra3Ctrl, loc.get('prod_hint_spec')),       const SizedBox(height: 14),
                     ],
 
-                    // ── Сулуулук талаалары ──
                     if (hasBeautyFields(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_brand')),  fieldW(extra1Ctrl, loc.get('prod_hint_brand_beauty')), const SizedBox(height: 14),
                       labelW(loc.get('prod_field_volume')), fieldW(extra2Ctrl, loc.get('prod_hint_volume')),       const SizedBox(height: 14),
                     ],
 
-                    // ── Авто талаалары ──
                     if (hasAutoFields(selectedMainCatId)) ...[
                       labelW(loc.get('prod_field_brand')),      fieldW(extra1Ctrl, loc.get('prod_hint_brand_auto')),  const SizedBox(height: 14),
                       labelW(loc.get('prod_field_car_compat')), fieldW(extra2Ctrl, loc.get('prod_hint_car_compat')), const SizedBox(height: 14),
                     ],
 
-                    // ── Склад ──
                     labelW(loc.get('prod_field_stock')),
                     fieldW(stockCtrl, loc.get('prod_hint_stock'), type: TextInputType.number),
                     const SizedBox(height: 14),
 
-                    // ── Сүрөттөмө ──
                     labelW(loc.get('prod_field_desc')),
                     TextField(
                       controller: descCtrl, maxLines: 3,
@@ -1055,49 +1446,76 @@ Future<void> pickImage(StateSetter setD) async {
                     ),
                     const SizedBox(height: 18),
 
-                    // ── Сактоо баскычы ──
                     SizedBox(
                       width: double.infinity, height: 52,
                       child: ElevatedButton(
                         onPressed: isLoading ? null : () async {
                           final name  = nameCtrl.text.trim();
                           final price = double.tryParse(priceCtrl.text.trim());
-                          if (name.isEmpty)                                   { _showSnack(loc.get('prod_err_name'),  isError: true); return; }
-                          if (price == null || price <= 0)                    { _showSnack(loc.get('prod_err_price'), isError: true); return; }
-                          if (imageBytes == null && existingImageUrl.isEmpty) { _showSnack(loc.get('prod_err_image'), isError: true); return; }
+                          if (name.isEmpty) { _showSnack(loc.get('prod_err_name'), isError: true); return; }
+                          // negotiation болгондо баа талап кылынбайт
+                          final needsPrice = !(pricingType == 'wholesale' && wholesaleMode == 'negotiation');
+                          if (needsPrice && (price == null || price <= 0)) { _showSnack(loc.get('prod_err_retail_price'), isError: true); return; }
+                          final wholesalePr = pricingType == 'wholesale' && wholesaleMode == 'price'
+                              ? double.tryParse(wholesalePriceCtrl.text.trim())
+                              : null;
+
+                          // ── ӨЗГӨРТҮҮ 4а: Валидация — 1-сүрөт міндеттүү ──
+                          if (newImageBytes[0] == null && existingImages[0].isEmpty) {
+                            _showSnack(loc.get('prod_err_image'), isError: true);
+                            return;
+                          }
+
                           setD(() { isLoading = true; uploadStatus = ''; });
                           try {
-                            String imageUrl = existingImageUrl;
-                            if (imageBytes != null) {
-                              setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
-                             // ЖАҢЫ — веб'де compress/watermark жок, түз жүктөйт
-final Uint8List uploadBytes;
-if (kIsWeb) {
-  uploadBytes = imageBytes!; // ← веб'де өзүн жүктөй берет
-} else {
-  final compressed  = await compressImage(imageBytes!);
-  uploadBytes       = await addWatermark(compressed);
-}
+                            // ── ӨЗГӨРТҮҮ 4б: 3 сүрөттү жүктөө ──
+                            setD(() { isUploading = true; uploadStatus = loc.get('prod_uploading'); });
+                            final List<String> finalImageUrls = [];
+                            bool anyUploadFailed = false;
 
-final uploaded = await YandexStorageService.instance.uploadImage(
-  uploadBytes,
-  folder: 'products',
-);
-
-                              if (uploaded == null) { setD(() { isLoading = false; isUploading = false; uploadStatus = ''; }); return; }
-                              imageUrl = uploaded;
-                              setD(() { isUploading = false; uploadStatus = loc.get('prod_uploaded'); });
+                            for (int i = 0; i < 3; i++) {
+                              if (newImageBytes[i] != null) {
+                                final Uint8List uploadBytes;
+                                if (kIsWeb) {
+                                  uploadBytes = newImageBytes[i]!;
+                                } else {
+                                  final compressed = await compressImage(newImageBytes[i]!);
+                                  uploadBytes      = await addWatermark(compressed);
+                                }
+                                final uploaded = await YandexStorageService.instance.uploadImage(
+                                  uploadBytes, folder: 'products',
+                                );
+                                if (uploaded == null) { anyUploadFailed = true; break; }
+                                finalImageUrls.add(uploaded);
+                              } else if (existingImages[i].isNotEmpty) {
+                                finalImageUrls.add(existingImages[i]);
+                              }
                             }
+
+                            if (anyUploadFailed) {
+                              setD(() { isLoading = false; isUploading = false; uploadStatus = ''; });
+                              return;
+                            }
+                            setD(() { isUploading = false; uploadStatus = loc.get('prod_uploaded'); });
+
                             setD(() => uploadStatus = loc.get('prod_saving'));
                             final storeId    = await _getOrCreateStoreId();
-                            // Эффективдүү категория ID сактайт (3-деңгээл болсо ошол)
                             final finalCatId = selectedSubItemId ?? selectedSubCatId ?? selectedMainCatId;
+                            // negotiation болгондо баа 0 болот
+                            final finalPrice = (pricingType == 'wholesale' && wholesaleMode == 'negotiation')
+                                ? 0.0
+                                : (price ?? 0.0);
                             final data = {
-                              'title': name, 'price': price, 'category_id': finalCatId, 'store_id': storeId,
-                              'images': [imageUrl], 'in_stock': int.tryParse(stockCtrl.text.trim()) ?? 0,
+                              'title': name, 'price': finalPrice, 'category_id': finalCatId, 'store_id': storeId,
+                              'images': finalImageUrls,   // ← 3 сүрөткө чейин
+                              'in_stock': int.tryParse(stockCtrl.text.trim()) ?? 0,
                               'description': descCtrl.text.trim(), 'colors': selectedColors, 'sizes': selectedSizes,
                               'extra1': extra1Ctrl.text.trim(), 'extra2': extra2Ctrl.text.trim(), 'extra3': extra3Ctrl.text.trim(),
                               'rating': existing?['rating'] ?? 0.0,
+                              // ── Баа тиби ──
+                              'pricing_type': pricingType,
+                              'wholesale_mode': wholesaleMode,
+                              'wholesale_price': wholesalePr,
                             };
                             if (existing != null) {
                               await supabase.from('products').update(data).eq('id', existing['id'] as String);
@@ -1134,27 +1552,84 @@ final uploaded = await YandexStorageService.instance.uploadImage(
     );
   }
 
+  Widget _pricingBadge(Map<String, dynamic> p, AppLocalizations loc, bool isDark) {
+    final type = p['pricing_type'] as String? ?? 'retail';
+    if (type == 'wholesale') {
+      final mode = p['wholesale_mode'] as String? ?? 'price';
+      if (mode == 'negotiation') {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF059669).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.handshake_outlined, color: Color(0xFF059669), size: 10),
+            const SizedBox(width: 3),
+            Text(loc.get('prod_badge_negotiation'),
+                style: const TextStyle(color: Color(0xFF059669), fontSize: 10, fontWeight: FontWeight.w700)),
+          ]),
+        );
+      }
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.store_rounded, color: Color(0xFF7C3AED), size: 10),
+          const SizedBox(width: 3),
+          Text(loc.get('prod_badge_wholesale'),
+              style: const TextStyle(color: Color(0xFF7C3AED), fontSize: 10, fontWeight: FontWeight.w700)),
+        ]),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.person_rounded, color: AppColors.primary, size: 10),
+        const SizedBox(width: 3),
+        Text(loc.get('prod_badge_retail'),
+            style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
   Widget _noImage(bool isDark) => Container(
         width: 80, height: 80,
         decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7), borderRadius: BorderRadius.circular(10)),
         child: const Center(child: Text('📦', style: TextStyle(fontSize: 28))),
       );
 
-  Widget _uploadPlaceholder(AppLocalizations loc) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        const Icon(Icons.add_photo_alternate_outlined, size: 40, color: AppColors.grey400),
-        const SizedBox(height: 8),
-        Text(loc.get('prod_img_tap'), style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey400)),
-        const SizedBox(height: 4),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.camera_alt_outlined, size: 14, color: AppColors.grey300),
-          const SizedBox(width: 4),
-          Text(loc.get('prod_img_camera'), style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey300)),
-          const SizedBox(width: 10),
-          const Icon(Icons.photo_library_outlined, size: 14, color: AppColors.grey300),
-          const SizedBox(width: 4),
-          Text(loc.get('prod_img_gallery'), style: AppTextStyles.labelSmall.copyWith(color: AppColors.grey300)),
-        ]),
-      ]);
+  // ── ӨЗГӨРТҮҮ 5: Жаңы _miniPlaceholder widget ──
+  Widget _miniPlaceholder(bool isRequired) => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.add_photo_alternate_outlined,
+            size: 26,
+            color: isRequired ? AppColors.primary.withValues(alpha: 0.7) : AppColors.grey400,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isRequired ? 'Сүрөт\nкошуу *' : '+',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: isRequired ? AppColors.primary.withValues(alpha: 0.7) : AppColors.grey400,
+            ),
+          ),
+        ],
+      );
+
 
   Widget _colorPicker(List<String> selected, StateSetter setD, bool isDark, AppLocalizations loc) {
     final unselBg   = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF7F7F7);
@@ -1208,6 +1683,629 @@ final uploaded = await YandexStorageService.instance.uploadImage(
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ══════════ Сатуучунун убактылуу акция экраны ══════════
+class SellerFlashSaleScreen extends StatefulWidget {
+  final String storeId;
+  const SellerFlashSaleScreen({super.key, required this.storeId});
+
+  @override
+  State<SellerFlashSaleScreen> createState() => _SellerFlashSaleScreenState();
+}
+
+class _SellerFlashSaleScreenState extends State<SellerFlashSaleScreen> {
+  List<Map<String, dynamic>> _flashProducts = [];
+  bool _loading = true;
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+  DateTime? _nearestEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final rows = await supabase
+          .from('products')
+          .select('id, title, images, price, flash_sale_price, flash_end_time')
+          .eq('store_id', widget.storeId)
+          .eq('is_flash_sale', true)
+          .eq('is_active', true)
+          .gt('flash_end_time', now)
+          .order('flash_end_time', ascending: true);
+
+      final items = (rows as List).cast<Map<String, dynamic>>();
+      DateTime? nearest;
+      for (final item in items) {
+        final t = _parseEnd(item);
+        if (t != null && (nearest == null || t.isBefore(nearest))) nearest = t;
+      }
+      if (mounted) {
+        setState(() { _flashProducts = items; _nearestEnd = nearest; _loading = false; });
+        _startTimer();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  DateTime? _parseEnd(Map<String, dynamic> item) {
+    final s = item['flash_end_time'] as String?;
+    return s != null ? DateTime.parse(s).toLocal() : null;
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (_nearestEnd == null) return;
+    _remaining = _nearestEnd!.difference(DateTime.now());
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final r = _nearestEnd!.difference(DateTime.now());
+      if (r.isNegative) { _timer?.cancel(); _load(); return; }
+      setState(() => _remaining = r);
+    });
+  }
+
+  Future<void> _removeFromFlash(String productId) async {
+    await supabase.from('products').update({
+      'is_flash_sale': false,
+      'flash_sale_price': null,
+      'flash_end_time': null,
+    }).eq('id', productId);
+    _load();
+  }
+
+  void _showAddBottomSheet() async {
+    // Сатуучунун флеш сатуудагысыз товарларын жүктө
+    DateTime.now().toUtc().toIso8601String();
+    final rows = await supabase
+        .from('products')
+        .select('id, title, images, price')
+        .eq('store_id', widget.storeId)
+        .eq('is_active', true)
+        .or('is_flash_sale.is.null,is_flash_sale.eq.false')
+        .order('title');
+
+    final available = (rows as List).cast<Map<String, dynamic>>();
+    if (!mounted) return;
+
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Кошуу үчүн товар жок'),
+        backgroundColor: AppColors.warning,
+      ));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddFlashSheet(
+        products: available,
+        onAdd: (productId, flashPrice, hours) async {
+          final endTime = DateTime.now().toUtc().add(Duration(hours: hours));
+          await supabase.from('products').update({
+            'is_flash_sale': true,
+            'flash_sale_price': flashPrice,
+            'flash_end_time': endTime.toIso8601String(),
+          }).eq('id', productId);
+          if (mounted) {
+            Navigator.pop(context);
+            _load();
+          }
+        },
+      ),
+    );
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F5F5);
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFDC2626),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          '⚡ Убактылуу акция',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            onPressed: _showAddBottomSheet,
+            tooltip: 'Товар кош',
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddBottomSheet,
+        backgroundColor: const Color(0xFFDC2626),
+        icon: const Icon(Icons.bolt_rounded, color: Colors.white),
+        label: const Text('Товар кош', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.error))
+          : _flashProducts.isEmpty
+              ? _EmptyState(onAdd: _showAddBottomSheet)
+              : Column(
+                  children: [
+                    // Таймер
+                    _MiniTimer(remaining: _remaining),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _load,
+                        color: AppColors.error,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
+                          itemCount: _flashProducts.length,
+                          itemBuilder: (_, i) => _FlashProductTile(
+                            item: _flashProducts[i],
+                            isDark: isDark,
+                            onRemove: () => _removeFromFlash(_flashProducts[i]['id'] as String),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
+}
+
+// ── Кичи таймер ──
+class _MiniTimer extends StatelessWidget {
+  final Duration remaining;
+  const _MiniTimer({required this.remaining});
+
+  @override
+  Widget build(BuildContext context) {
+    final h = remaining.inHours.toString().padLeft(2, '0');
+    final m = (remaining.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (remaining.inSeconds % 60).toString().padLeft(2, '0');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.timer_outlined, color: Colors.white70, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Эң жакын акция бүтөт: $h:$m:$s',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Товар тизме карточкасы ──
+class _FlashProductTile extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool isDark;
+  final VoidCallback onRemove;
+  const _FlashProductTile({required this.item, required this.isDark, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final name       = item['title'] as String? ?? '';
+    final images     = List<String>.from(item['images'] as List? ?? []);
+    final imageUrl   = images.isNotEmpty ? images.first : '';
+    final origPrice  = (item['price'] as num?)?.toDouble() ?? 0;
+    final flashPrice = (item['flash_sale_price'] as num?)?.toDouble() ?? origPrice;
+    final discPct    = origPrice > 0 ? ((origPrice - flashPrice) / origPrice * 100).round() : 0;
+    final endStr     = item['flash_end_time'] as String?;
+    final endTime    = endStr != null ? DateTime.parse(endStr).toLocal() : null;
+    final timeLeft   = endTime != null ? endTime.difference(DateTime.now()) : Duration.zero;
+    final h = timeLeft.inHours.toString().padLeft(2, '0');
+    final mn = (timeLeft.inMinutes % 60).toString().padLeft(2, '0');
+
+    final cardBg = isDark ? const Color(0xFF1C1C1C) : Colors.white;
+    final border = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFEEEEEE);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.error.withOpacity(0.25)),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        children: [
+          // Сүрөт
+          ClipRRect(
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+            child: imageUrl.isNotEmpty
+                ? CachedNetworkImage(imageUrl: imageUrl, width: 80, height: 80, fit: BoxFit.cover)
+                : Container(width: 80, height: 80, color: border, child: const Icon(Icons.image_outlined, color: AppColors.grey400)),
+          ),
+          const SizedBox(width: 12),
+          // Маалымат
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Text('${flashPrice.toStringAsFixed(0)} с',
+                        style: const TextStyle(color: AppColors.error, fontSize: 15, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 6),
+                    if (discPct > 0)
+                      Text('${origPrice.toStringAsFixed(0)} с',
+                          style: TextStyle(color: isDark ? Colors.white38 : AppColors.grey400, fontSize: 11,
+                              decoration: TextDecoration.lineThrough, decorationColor: isDark ? Colors.white38 : AppColors.grey400)),
+                    if (discPct > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(4)),
+                        child: Text('-$discPct%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ]),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.timer_outlined, size: 12, color: AppColors.error),
+                    const SizedBox(width: 3),
+                    Text('$h саат $mn мин калды', style: const TextStyle(color: AppColors.error, fontSize: 11)),
+                  ]),
+                ],
+              ),
+            ),
+          ),
+          // Жок кылуу
+          IconButton(
+            icon: const Icon(Icons.close_rounded, color: AppColors.error, size: 20),
+            onPressed: onRemove,
+            tooltip: 'Акциядан алып салуу',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Товар кошуу bottom sheet ──
+class _AddFlashSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> products;
+  final Future<void> Function(String productId, double flashPrice, int hours) onAdd;
+  const _AddFlashSheet({required this.products, required this.onAdd});
+
+  @override
+  State<_AddFlashSheet> createState() => _AddFlashSheetState();
+}
+
+class _AddFlashSheetState extends State<_AddFlashSheet> {
+  Map<String, dynamic>? _selected;
+  final _priceCtrl = TextEditingController();
+  int _hours = 24;
+  bool _saving = false;
+  String _query = '';
+
+  List<Map<String, dynamic>> get _filteredProducts => widget.products
+      .where((p) => ((p['title'] as String?) ?? '')
+          .toLowerCase()
+          .contains(_query.toLowerCase().trim()))
+      .toList();
+
+  @override
+  void dispose() { _priceCtrl.dispose(); super.dispose(); }
+
+  double get _origPrice => (_selected?['price'] as num?)?.toDouble() ?? 0;
+  double get _flashPrice => double.tryParse(_priceCtrl.text) ?? 0;
+  int get _discPct => _origPrice > 0 && _flashPrice > 0
+      ? ((_origPrice - _flashPrice) / _origPrice * 100).round() : 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final subColor = isDark ? Colors.white70 : const Color(0xFF555555);
+
+    final filtered = _filteredProducts;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.92,
+      decoration: BoxDecoration(
+        color: sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ──
+            Center(child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.4), borderRadius: BorderRadius.circular(2)),
+            )),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: Row(children: [
+                const Icon(Icons.bolt_rounded, color: AppColors.error, size: 22),
+                const SizedBox(width: 8),
+                Text('Убактылуу акцияга кош',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+              ]),
+            ),
+
+            // ── Товар тизмеси ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Товарды тандаңыз', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: subColor)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: TextField(
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Товар издөө...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 120,
+              child: filtered.isEmpty
+                  ? Center(child: Text('Товар табылган жок', style: TextStyle(color: subColor)))
+                  : ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final p = filtered[i];
+                  final imgs = List<String>.from(p['images'] as List? ?? []);
+                  final img = imgs.isNotEmpty ? imgs.first : '';
+                  final isSelected = _selected?['id'] == p['id'];
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selected = p;
+                        _priceCtrl.text = ((p['price'] as num?)?.toDouble() ?? 0)
+                            .toStringAsFixed(0);
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: const EdgeInsets.only(right: 10),
+                      width: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppColors.error : Colors.transparent,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: img.isNotEmpty
+                                ? CachedNetworkImage(imageUrl: img, width: 70, height: 70, fit: BoxFit.cover)
+                                : Container(width: 70, height: 70, color: Colors.grey.withOpacity(0.2)),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(p['title'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 9, color: subColor)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            if (_selected != null) ...[
+              const SizedBox(height: 16),
+
+              // ── Акция баасы ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Акция баасы (с)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: subColor)),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _priceCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Акция бааны киргиз',
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      if (_discPct > 0) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text('-$_discPct%',
+                              style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.w800, fontSize: 18)),
+                        ),
+                      ],
+                    ]),
+                    if (_origPrice > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Баштапкы баа: ${_origPrice.toStringAsFixed(0)} с',
+                            style: TextStyle(fontSize: 11, color: subColor)),
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Убакыт ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Убакыт', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: subColor)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [3, 6, 12, 24, 48, 72].map((h) {
+                        final isActive = _hours == h;
+                        return GestureDetector(
+                          onTap: () => setState(() => _hours = h),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isActive ? AppColors.error : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0)),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              h < 24 ? '$h саат' : '${h ~/ 24} күн',
+                              style: TextStyle(
+                                color: isActive ? Colors.white : subColor,
+                                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Кош баскычы ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: (_saving || _flashPrice <= 0 || _flashPrice >= _origPrice)
+                        ? null
+                        : () async {
+                            setState(() => _saving = true);
+                            await widget.onAdd(_selected!['id'] as String, _flashPrice, _hours);
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      disabledBackgroundColor: Colors.grey.withOpacity(0.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: _saving
+                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            const Icon(Icons.bolt_rounded, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text('Акцияга кош ($_hours ${_hours < 24 ? 'саат' : 'саат'})',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                          ]),
+                  ),
+                ),
+              ),
+            ] else
+              const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Бош абал ──
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onAdd;
+  const _EmptyState({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('⚡', style: TextStyle(fontSize: 64)),
+          const SizedBox(height: 16),
+          const Text('Убактылуу акция жок',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          const Text('Товарга убакыт менен арзандатуу кош',
+              style: TextStyle(color: AppColors.grey400, fontSize: 14)),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.bolt_rounded),
+            label: const Text('Товар кош'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

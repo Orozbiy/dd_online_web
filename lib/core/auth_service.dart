@@ -1,4 +1,4 @@
-import 'package:dd_online/features/admin/widgets/admin_notification_sender.dart';
+import '../services/notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -74,9 +74,12 @@ class AuthService {
       }).eq('id', user.id);
     } catch (_) {}
 
-    try {
-      NotificationService().saveMyToken();
-    } catch (_) {}
+    // ВЕБ: push токен уруксат берилгенден кийин (Орнотуулар → Билдирүүлөр)
+    if (!kIsWeb) {
+      try {
+        NotificationService().saveMyToken();
+      } catch (_) {}
+    }
   }
 
   Future<String> getUserRole() async {

@@ -452,13 +452,14 @@ Future<List<ProductModel>> fetchPopular({
     int limit = 50,
   }) async {
     try {
+      // ✅ title ЖАНА description экөөнү бирге издейт
+      // мис. "Samsung S24 Ultra" description'до жазылса да табылат
       var q = supabase
           .from('products')
           .select('*, stores(store_name, owner_id, has_negotiation)')
           .eq('is_active', true)
-          .ilike('title', '%$pattern%');
+          .or('title.ilike.%$pattern%,description.ilike.%$pattern%');
 
-      // ✅ ОҢДОО: .eq → .like
       if (categoryId != null && categoryId.isNotEmpty) {
         q = q.like('category_id', '$categoryId%');
       }

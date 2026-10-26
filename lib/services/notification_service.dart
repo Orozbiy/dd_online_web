@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 import '../core/supabase_client.dart';
+import '../core/services/in_app_notification_banner.dart';
 import '../features/chat/screens/chat_screen.dart';
 import '../features/product_detail/screens/product_detail_screen.dart';
 import '../data/models/product_model.dart';
+import '../features/notifications/screens/notifications_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
 // GLOBAL NAVIGATOR KEY — MaterialApp'ка берилет
@@ -25,8 +27,10 @@ class NotificationService {
 
   static String? pendingChatId;
   static String? pendingProductId;
+  static bool pendingNotifications = false;
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  // Lazy getter: NotificationService() Firebase init болгонго чейин чакырылса да кулабайт
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
   // ─────────────────────────────────────────────────────────────
   // INIT
@@ -54,7 +58,9 @@ class NotificationService {
           ?? 'Жаңы билдирүү';
 
       String payload = '';
-      if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
+      if (type == 'admin_broadcast') {
+        payload = 'notifications';
+      } else if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
         payload = 'chat:$chatId';
       } else if (type == 'price_drop' && productId != null && productId.isNotEmpty) {
         payload = 'product:$productId';
@@ -74,7 +80,9 @@ class NotificationService {
 
       await Future.delayed(const Duration(milliseconds: 800));
 
-      if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
+      if (type == 'admin_broadcast') {
+        _openNotifications();
+      } else if (type == 'chat_message' && chatId != null && chatId.isNotEmpty) {
         await _navigateToChat(chatId);
       } else if (type == 'price_drop' && productId != null && productId.isNotEmpty) {
         await navigateToProductPublic(productId);
@@ -99,6 +107,20 @@ class NotificationService {
   void _showWebSnackbar(String title, String body, String payload) {
     final context = navigatorKey.currentContext;
     if (context == null) return;
+
+    // app'тагыдай айнек banner; Overlay табылбаса — SnackBar'га түшөт
+    try {
+      InAppNotificationBanner.show(
+        context: context,
+        title: title,
+        body: body,
+        avatarText: title,
+        onTap: () => _handlePayload(payload),
+      );
+      return;
+    } catch (e) {
+      debugPrint('⚠️ Banner көрсөтүлгөн жок, SnackBar колдонулат: $e');
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -133,7 +155,9 @@ class NotificationService {
   // ─────────────────────────────────────────────────────────────
   void _handlePayload(String payload) {
     if (payload.isEmpty) return;
-    if (payload.startsWith('chat:')) {
+    if (payload == 'notifications') {
+      _openNotifications();
+    } else if (payload.startsWith('chat:')) {
       final chatId = payload.substring(5);
       if (chatId.isNotEmpty) _navigateToChat(chatId);
     } else if (payload.startsWith('product:')) {
@@ -142,6 +166,20 @@ class NotificationService {
     } else {
       _navigateToChat(payload);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // АДМИН БИЛДИРҮҮЛӨР ЭКРАНЫН АЧУУ
+  // ─────────────────────────────────────────────────────────────
+  void _openNotifications() {
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null) {
+      NotificationService.pendingNotifications = true;
+      return;
+    }
+    Navigator.of(ctx).push(
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────

@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'features/notifications/screens/notifications_screen.dart';
 
 import 'config/theme/app_theme.dart';
 import 'core/supabase_client.dart';
 import 'core/utils/favorites_manager.dart';
 import 'core/active_status_tracker.dart';
+import 'core/chat_background_provider.dart';
 import 'core/locale_provider.dart';
 import 'core/app_localizations.dart';
 import 'core/theme_provider.dart';
@@ -51,6 +53,12 @@ Future<void> main() async {
     await _initFirebase();
     await NotificationService().handleInitialMessage();
   }
+
+  // Чат фону (колдонуучу тандаган) — SharedPreferences'тен
+  try {
+    await ChatBackgroundProvider.instance.load()
+        .timeout(const Duration(seconds: 3));
+  } catch (_) {}
 
   // ✅ ВЕБ'де timeout менен — бекип калбасын
   if (kIsWeb) {
@@ -253,6 +261,17 @@ class _SplashRouterState extends State<SplashRouter> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await Future.delayed(const Duration(milliseconds: 600));
         NotificationService().navigateToChatPublic(pendingChat);
+      });
+    }
+
+    // ── Pending notifications (admin broadcast) ──
+    if (NotificationService.pendingNotifications) {
+      NotificationService.pendingNotifications = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future.delayed(const Duration(milliseconds: 600));
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        );
       });
     }
 

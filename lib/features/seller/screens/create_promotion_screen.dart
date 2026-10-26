@@ -4,6 +4,7 @@ import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
 import '../../../core/supabase_client.dart';
 import '../../../services/price_watch_service.dart';
+import '../../../core/app_localizations.dart';
 
 
 class CreatePromotionScreen extends StatefulWidget {
@@ -72,6 +73,7 @@ class _CreatePromotionScreenState extends State<CreatePromotionScreen> {
   }
 
   Future<void> _savePromotion() async {
+    final loc = AppLocalizations.of(context);
     final pct = double.tryParse(_discountCtrl.text);
     if (_selected == null || pct == null || pct <= 0 || pct >= 100) return;
     setState(() => _saving = true);
@@ -91,7 +93,7 @@ await PriceWatchService().notifyWatchers(
   newPrice:    _discountedPrice!,
 );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Акция ийгилүү кошулду ✅'), backgroundColor: AppColors.success));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.get('promo_added_success')} ✅'), backgroundColor: AppColors.success));
         setState(() {
           final idx = _allProducts.indexWhere((p) => p['id'] == _selected!['id']);
           if (idx != -1) { _allProducts[idx]['discount_percent'] = pct; _allProducts[idx]['discounted_price'] = _discountedPrice; _allProducts[idx]['has_promotion'] = true; _selected = _allProducts[idx]; }
@@ -99,19 +101,20 @@ await PriceWatchService().notifyWatchers(
         });
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ката: $e'), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.get('error')}: $e'), backgroundColor: AppColors.error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _deletePromotion() async {
+    final loc = AppLocalizations.of(context);
     if (_selected == null) return;
     setState(() => _saving = true);
     try {
       await supabase.from('products').update({'discount_percent': null, 'discounted_price': null, 'has_promotion': false}).eq('id', _selected!['id']);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Акция жок кылынды 🗑️'), backgroundColor: AppColors.warning));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.get('promo_removed_success')} 🗑️'), backgroundColor: AppColors.warning));
         setState(() {
           final idx = _allProducts.indexWhere((p) => p['id'] == _selected!['id']);
           if (idx != -1) { _allProducts[idx]['discount_percent'] = null; _allProducts[idx]['discounted_price'] = null; _allProducts[idx]['has_promotion'] = false; _selected = _allProducts[idx]; }
@@ -119,7 +122,7 @@ await PriceWatchService().notifyWatchers(
         });
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ката: $e'), backgroundColor: AppColors.error));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.get('error')}: $e'), backgroundColor: AppColors.error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -129,6 +132,7 @@ await PriceWatchService().notifyWatchers(
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor    = isDark ? const Color(0xFF121212) : AppColors.grey50;
     final appBarColor = isDark ? const Color(0xFF1E1E1E) : AppColors.white;
@@ -137,7 +141,7 @@ await PriceWatchService().notifyWatchers(
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text('Акция башкаруу', style: TextStyle(color: titleColor)),
+        title: Text(loc.get('promo_manage_title'), style: TextStyle(color: titleColor)),
         backgroundColor: appBarColor,
         foregroundColor: isDark ? Colors.white : AppColors.black,
         elevation: 0,
@@ -156,7 +160,7 @@ await PriceWatchService().notifyWatchers(
               ),
               Expanded(
                 child: _filtered.isEmpty
-                    ? Center(child: Text('Товар табылган жок', style: AppTextStyles.bodyMedium.copyWith(color: isDark ? Colors.white70 : AppColors.black)))
+                    ? Center(child: Text(loc.get('fs_not_found'), style: AppTextStyles.bodyMedium.copyWith(color: isDark ? Colors.white70 : AppColors.black)))
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         itemCount: _filtered.length,
@@ -187,6 +191,7 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark    = Theme.of(context).brightness == Brightness.dark;
     final barColor  = isDark ? const Color(0xFF1E1E1E) : AppColors.white;
     final fillColor = isDark ? const Color(0xFF2C2C2C) : AppColors.grey100;
@@ -200,7 +205,7 @@ class _SearchBar extends StatelessWidget {
         onChanged: onChanged,
         style: AppTextStyles.bodyMedium.copyWith(color: textColor),
         decoration: InputDecoration(
-          hintText: 'Товар издөө...',
+          hintText: loc.get('promo_search_hint'),
           hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey400),
           prefixIcon: const Icon(Icons.search, color: AppColors.grey400),
           suffixIcon: controller.text.isNotEmpty
@@ -236,6 +241,7 @@ class _SelectedProductPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark         = Theme.of(context).brightness == Brightness.dark;
     final originalPrice  = (product['price'] as num?)?.toDouble() ?? 0;
     final name           = product['title'] as String? ?? '';
@@ -286,7 +292,7 @@ class _SelectedProductPanel extends StatelessWidget {
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d{0,2}\.?\d{0,1}'))],
             style: AppTextStyles.bodyMedium.copyWith(color: textColor),
             decoration: InputDecoration(
-              hintText: 'Чегерим пайызын киргизиңиз (мис: 15)',
+              hintText: loc.get('discount_percent_hint'),
               hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.grey400),
               suffixText: '%',
               suffixStyle: AppTextStyles.labelLarge.copyWith(color: AppColors.primary),
@@ -323,7 +329,7 @@ class _SelectedProductPanel extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 18),
-                label: const Text('Акцияны жок кылуу'),
+                label: Text(loc.get('promo_remove_btn')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: const BorderSide(color: AppColors.error),
@@ -408,6 +414,7 @@ class _BottomSaveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark    = Theme.of(context).brightness == Brightness.dark;
     final barColor  = isDark ? const Color(0xFF1E1E1E) : AppColors.white;
     final divColor  = isDark ? const Color(0xFF2C2C2C) : AppColors.grey200;
@@ -427,7 +434,7 @@ class _BottomSaveButton extends StatelessWidget {
           ),
           child: loading
               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : Text('Акцияны сактоо', style: AppTextStyles.headingSmall.copyWith(color: AppColors.white)),
+              : Text(loc.get('promo_save_btn'), style: AppTextStyles.headingSmall.copyWith(color: AppColors.white)),
         ),
       ),
     );

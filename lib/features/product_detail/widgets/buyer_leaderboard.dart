@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 
 class BuyerLeaderboard extends StatefulWidget {
@@ -93,6 +94,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark     = Theme.of(context).brightness == Brightness.dark;
     final bgColor    = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
     final cardColor  = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -109,7 +111,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
           child: Icon(Icons.arrow_back,
               color: isDark ? Colors.white : AppColors.black),
         ),
-        title: Text('🏆 Алуучулар тизмеги',
+        title: Text('🏆 ${loc.get('leaderboard_title')}',
             style: AppTextStyles.headingMedium.copyWith(color: titleColor)),
         actions: [
           IconButton(
@@ -127,7 +129,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
           : Column(
               children: [
                 // ── Менин ачкычым (жогорку карточка) ──
-                if (_myUid != null) _buildMyCard(isDark, cardColor, titleColor),
+                if (_myUid != null) _buildMyCard(isDark, cardColor, titleColor, loc),
 
                 // ── Маалымат ──
                 Container(
@@ -145,10 +147,9 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Товарды ар 3 жолу көргөндө 1 ачкыч берилет. '
-                        'Рейтинг 5 саат сайын жаңыланат.',
+                        loc.get('leaderboard_info'),
                         style: AppTextStyles.labelSmall
-                            .copyWith(color: AppColors.primary, fontSize: 11),
+                            .copyWith(color: AppColors.primary, fontSize: 13),
                       ),
                     ),
                   ]),
@@ -164,11 +165,11 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
                               const Text('🏆',
                                   style: TextStyle(fontSize: 64)),
                               const SizedBox(height: 16),
-                              Text('Азырынча тизме бош',
+                              Text(loc.get('leaderboard_empty_title'),
                                   style: AppTextStyles.headingSmall
                                       .copyWith(color: AppColors.grey400)),
                               const SizedBox(height: 8),
-                              Text('Товарды карап ачкыч жыйна!',
+                              Text(loc.get('leaderboard_empty_subtitle'),
                                   style: AppTextStyles.bodyMedium
                                       .copyWith(color: AppColors.grey500)),
                             ],
@@ -178,7 +179,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
                           padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
                           itemCount: _topBuyers.length,
                           itemBuilder: (ctx, i) =>
-                              _buildRow(_topBuyers[i], i, isDark, cardColor, titleColor),
+                              _buildRow(_topBuyers[i], i, isDark, cardColor, titleColor, loc),
                         ),
                 ),
               ],
@@ -187,7 +188,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
   }
 
   // ── Менин карточкам ──
-  Widget _buildMyCard(bool isDark, Color cardColor, Color titleColor) {
+  Widget _buildMyCard(bool isDark, Color cardColor, Color titleColor, AppLocalizations loc) {
     final myRank   = _myEntry?['rank'] as int?;
     final myKeys   = (_myEntry?['keys_count'] as int?) ?? 0;
     final myViews  = (_myEntry?['views_count'] as int?) ?? 0;
@@ -223,27 +224,27 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Менин ачкычтарым',
+            Text(loc.get('my_keys_label'),
                 style: AppTextStyles.labelMedium.copyWith(color: titleColor)),
             const SizedBox(height: 4),
             Row(children: [
-              _statChip('🔑 $myKeys ачкыч', AppColors.primary),
+              _statChip('🔑 $myKeys ${loc.get('keys_unit')}', AppColors.primary),
               const SizedBox(width: 8),
-              _statChip('👁 $myViews көрүү', AppColors.grey500),
+              _statChip('👁 $myViews ${loc.get('views_unit')}', AppColors.grey500),
             ]),
           ]),
         ),
         // Орун
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(
-            inTop150 ? '#$myRank' : 'Топ 150 сыртында',
+            inTop150 ? '#$myRank' : loc.get('outside_top150'),
             style: AppTextStyles.headingSmall.copyWith(
               color: inTop150 ? AppColors.primary : AppColors.grey400,
               fontSize: inTop150 ? 20 : 12,
             ),
           ),
           if (!inTop150)
-            Text('$myKeys ачкыч',
+            Text('$myKeys ${loc.get('keys_unit')}',
                 style: AppTextStyles.labelSmall
                     .copyWith(color: AppColors.grey500)),
         ]),
@@ -258,10 +259,11 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
     bool isDark,
     Color cardColor,
     Color titleColor,
+    AppLocalizations loc,
   ) {
     final rank      = (entry['rank'] as int?) ?? (index + 1);
     final keys      = (entry['keys_count'] as int?) ?? 0;
-    final name      = (entry['full_name'] as String?) ?? 'Колдонуучу';
+    final name      = (entry['full_name'] as String?) ?? loc.get('default_user_name');
     final avatar    = entry['avatar_url'] as String?;
     final uid       = entry['user_id'] as String?;
     final isMe      = uid == _myUid;
@@ -354,7 +356,7 @@ class _BuyerLeaderboardState extends State<BuyerLeaderboard> {
       ),
       child: Text(text,
           style: AppTextStyles.labelSmall
-              .copyWith(color: color, fontSize: 11)),
+              .copyWith(color: color, fontSize: 13)),
     );
   }
 }

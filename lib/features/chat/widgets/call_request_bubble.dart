@@ -1,5 +1,5 @@
 // lib/features/chat/widgets/call_request_bubble.dart
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/theme/app_colors.dart';
@@ -60,177 +60,119 @@ class CallRequestBubble extends StatelessWidget {
       ),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 260),
-          decoration: BoxDecoration(
-            color: _bgColor(accepted, declined),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isMe ? 16 : 4),
-              bottomRight: Radius.circular(isMe ? 4 : 16),
-            ),
-            border: Border.all(
-              color: _borderColor(accepted, declined),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Иконка + аталыш ──
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: _iconBg(accepted, declined),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _icon(accepted, declined),
-                        color: _iconColor(accepted, declined),
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _title(loc, accepted, declined),
-                            style: AppTextStyles.labelLarge.copyWith(
-                              color: _titleColor(accepted, declined),
-                            ),
-                          ),
-                          Text(
-                            message.formattedTime,
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.grey400,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 260),
+              decoration: BoxDecoration(
+                color: _bgColor(accepted, declined).withValues(alpha: 0.55),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 16),
                 ),
-
-                // ── Статус (pending эмес болсо) ──
-                if (!pending) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: accepted
-                          ? AppColors.success.withValues(alpha: 0.1)
-                          : AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      accepted
-                          ? loc.get('call_request_status_ok')
-                          : loc.get('call_request_status_no'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: accepted ? AppColors.success : AppColors.error,
-                      ),
-                    ),
-                  ),
-                  // ✅ Кардар жагында + accepted болсо — чалуу баскычы
-                  if (accepted && isMe) ...[
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () async {
-                        if (myPhone.isNotEmpty) {
-                          final uri = Uri.parse('tel:$myPhone');
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri);
-                          }
-                        }
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '📞 Чалуу',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                border: Border.all(
+                  color: _borderColor(accepted, declined).withValues(alpha: 0.50),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: _iconBg(accepted, declined),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _icon(accepted, declined),
+                            color: _iconColor(accepted, declined),
+                            size: 18,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ],
-
-                // ── Сатуучунун баскычтары (pending болсо гана) ──
-                if (isSeller && !isMe && pending) ...[
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: AppColors.grey200),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _updateStatus(context, 'declined'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColors.error.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                loc.get('call_request_decline_btn'),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.error,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _title(loc, accepted, declined),
+                                style: AppTextStyles.labelLarge.copyWith(
+                                  color: _titleColor(accepted, declined),
                                 ),
                               ),
-                            ),
+                              Text(
+                                message.formattedTime,
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.grey400,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!pending) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: accepted
+                              ? AppColors.success.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          accepted
+                              ? loc.get('call_request_status_ok')
+                              : loc.get('call_request_status_no'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                accepted ? AppColors.success : AppColors.error,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _updateStatus(context, 'accepted'),
+                      if (accepted && isMe) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () async {
+                            if (myPhone.isNotEmpty) {
+                              final uri = Uri.parse('tel:$myPhone');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              }
+                            }
+                          },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: AppColors.success,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Center(
+                            child: const Center(
                               child: Text(
-                                loc.get('call_request_accept_btn'),
-                                style: const TextStyle(
-                                  fontSize: 12,
+                                '📞 Чалуу',
+                                style: TextStyle(
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
@@ -238,18 +180,80 @@ class CallRequestBubble extends StatelessWidget {
                             ),
                           ),
                         ),
+                      ],
+                    ],
+                    if (isSeller && !isMe && pending) ...[
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: AppColors.grey200),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  _updateStatus(context, 'declined'),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.error.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.error
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    loc.get('call_request_decline_btn'),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  _updateStatus(context, 'accepted'),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    loc.get('call_request_accept_btn'),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
-
   // ── Жардамчы методдор ────────────────────────────────────
 
   String _title(AppLocalizations loc, bool accepted, bool declined) {

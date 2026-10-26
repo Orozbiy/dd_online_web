@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme/app_colors.dart';
 import '../../../config/theme/app_text_styles.dart';
+import '../../../core/app_localizations.dart';
 import '../../../core/supabase_client.dart';
 
 class SellerEditProfileScreen extends StatefulWidget {
@@ -86,6 +87,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
 
   // ── Сактоо ────────────────────────────────────────────────────────────────
   Future<void> _save() async {
+    final loc = AppLocalizations.of(context);
     setState(() => _isLoading = true);
     try {
       final uid = supabase.auth.currentUser?.id;
@@ -120,9 +122,9 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Сакталды!'),
-            backgroundColor: Color(0xFF16A34A),
+          SnackBar(
+            content: Text('✅ ${loc.get('saved_success')}'),
+            backgroundColor: const Color(0xFF16A34A),
           ),
         );
         Navigator.pop(context, true);
@@ -130,7 +132,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Ката: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('❌ ${loc.get('error')}: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -141,6 +143,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
   // ── UI ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final isDark   = Theme.of(context).brightness == Brightness.dark;
     final bgColor  = isDark ? const Color(0xFF121212) : const Color(0xFFF4F5F7);
 
@@ -154,7 +157,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
               color: isDark ? Colors.white : AppColors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Профилди өзгөртүү',
+        title: Text(loc.get('seller_edit_profile_title'),
             style: AppTextStyles.headingMedium.copyWith(
                 color: isDark ? Colors.white : AppColors.black)),
       ),
@@ -165,13 +168,13 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildField('Сатуучунун аты', _nameCtrl, isDark),
+                  _buildField(loc.get('seller_name_label'), _nameCtrl, isDark),
                   const SizedBox(height: 14),
-                  _buildField('Магазиндин аты', _shopCtrl, isDark),
+                  _buildField(loc.get('shop_name_label'), _shopCtrl, isDark),
                   const SizedBox(height: 14),
-                  _buildField('Контейнер / Жер номери', _containerCtrl, isDark),
+                  _buildField(loc.get('container_location_label'), _containerCtrl, isDark),
                   const SizedBox(height: 24),
-                  _buildStoreTypeSelector(isDark),
+                  _buildStoreTypeSelector(isDark, loc),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
@@ -191,7 +194,7 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
                               height: 22,
                               child: CircularProgressIndicator(
                                   color: Colors.white, strokeWidth: 2.5))
-                          : const Text('Сактоо',
+                          : Text(loc.get('save'),
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -205,24 +208,24 @@ class _SellerEditProfileScreenState extends State<SellerEditProfileScreen> {
     );
   }
 
-  Widget _buildStoreTypeSelector(bool isDark) {
+  Widget _buildStoreTypeSelector(bool isDark, AppLocalizations loc) {
     final labelColor = isDark ? Colors.white70 : AppColors.grey600;
     final cardBg     = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Дүкөн түрү',
+        Text(loc.get('store_type_label'),
             style: AppTextStyles.labelMedium.copyWith(color: labelColor)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _typeCard('🏪', 'Рынок',      'market',  cardBg, isDark)),
+          Expanded(child: _typeCard('🏪', loc.get('market_type_label'),      'market',  cardBg, isDark)),
           const SizedBox(width: 12),
-          Expanded(child: _typeCard('🏬', 'Жеке дүкөн', 'private', cardBg, isDark)),
+          Expanded(child: _typeCard('🏬', loc.get('private_store_type_label'), 'private', cardBg, isDark)),
         ]),
         if (_storeType == 'market') ...[
           const SizedBox(height: 16),
-          Text('Рынок тандаңыз',
+          Text(loc.get('choose_market_label'),
               style: AppTextStyles.labelMedium.copyWith(color: labelColor)),
           const SizedBox(height: 8),
           Container(

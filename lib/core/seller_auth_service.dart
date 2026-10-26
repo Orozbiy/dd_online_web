@@ -1,4 +1,5 @@
 import '../features/seller/models/seller_model.dart';
+import '../services/notification_service.dart';
 import 'supabase_client.dart';
 import 'package:flutter/foundation.dart';
 
@@ -44,24 +45,27 @@ class SellerAuthService {
       throw const SellerInvalidCredentialsException();
     }
 
-    final row = await supabase
-        .from(_table)
-        .update({
-          'phone': phone,
-          'full_name': fullName,
-          'age': age,
-          'container_number': containerNumber,
-          'store_type': storeType,
-          'market_name': marketName,
-          'shop_name': shopName.isNotEmpty ? shopName : containerNumber,
-          'seller_status': 'pending',
-        })
-        .eq('id', user.id)
-        .select()
-        .single();
+   final row = await supabase
+    .from(_table)
+    .update({
+      'phone':            phone,
+      'full_name':        fullName,
+      'age':              age,
+      'container_number': containerNumber,
+      'store_type':       storeType,
+      'market_name':      marketName,
+      'shop_name':        shopName.isNotEmpty ? shopName : containerNumber,
+      'seller_status':    'pending',
+      'role':             'seller',          // ← кош
+      'avatar_url':       null,              // ← кош (баш тамга көрсөтүлөт)
+      'email':            email,             // ← кош
+    })
+    .eq('id', user.id)
+    .select()
+    .single();
 
     // ✅ FCM токенди сакта
-
+    await NotificationService().saveMyToken();
 
     // ✅ Adminге Telegram билдирүү жөнөт
    try {
@@ -121,7 +125,7 @@ class SellerAuthService {
       throw const SellerRejectedException();
     }
 
-  
+    await NotificationService().saveMyToken();
 
     return SellerModel.fromJson(row);
   }

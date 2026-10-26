@@ -3,6 +3,7 @@ class ProductModel {
   final String name;
   final double price;
   final String imageUrl;
+  final List<String> images;
   final String shopId;
   final String? category;
   final String? description;
@@ -25,12 +26,17 @@ class ProductModel {
   final int viewsCount;
   final int likesCount;
   final bool hasNegotiation;
+  // ✅ ЖАҢЫ: баа тиби (retail / wholesale)
+  final String pricingType;    // 'retail' | 'wholesale'
+  final String wholesaleMode;  // 'price' | 'negotiation'
+  final double? wholesalePrice;
 
   ProductModel({
     required this.id,
     required this.name,
     required this.price,
     required this.imageUrl,
+    this.images = const [],
     required this.shopId,
     this.category,
     this.description,
@@ -52,6 +58,9 @@ class ProductModel {
     this.viewsCount = 0, // ✅ ЖАҢЫ
     this.likesCount = 0, // ✅ ЖАҢЫ
     this.hasNegotiation = false,
+    this.pricingType = 'retail',
+    this.wholesaleMode = 'price',
+    this.wholesalePrice,
   });
 
   /// Товар 10 күндөн жаш болсо — "Жаңы" badge көрсөтүлөт
@@ -70,6 +79,7 @@ class ProductModel {
       name: data['title'] as String? ?? '',
       price: (data['price'] as num?)?.toDouble() ?? 0,
       imageUrl: images.isNotEmpty ? images.first : '',
+      images: images,
       shopId: data['store_id'] as String? ?? '',
       category: data['category_id'] as String?,
       description: data['description'] as String?,
@@ -95,6 +105,9 @@ class ProductModel {
       // ✅ ЖАҢЫ
       viewsCount: (data['views_count'] as num?)?.toInt() ?? 0,
       likesCount: (data['likes_count'] as num?)?.toInt() ?? 0,
+      pricingType: data['pricing_type'] as String? ?? 'retail',
+      wholesaleMode: data['wholesale_mode'] as String? ?? 'price',
+      wholesalePrice: (data['wholesale_price'] as num?)?.toDouble(),
     );
   }
 
@@ -106,7 +119,7 @@ class ProductModel {
       'id': id,
       'title': name,
       'price': price,
-      'images': [imageUrl],
+      'images': images.isNotEmpty ? images : [imageUrl],
       'store_id': shopId,
       'category_id': category,
       'description': description,
@@ -118,6 +131,9 @@ class ProductModel {
       'discounted_price': discountedPrice,
       'has_promotion': hasPromotion,
       'has_negotiation': hasNegotiation,
+      'pricing_type': pricingType,
+      'wholesale_mode': wholesaleMode,
+      if (wholesalePrice != null) 'wholesale_price': wholesalePrice,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (region != null) 'region': region,
@@ -141,6 +157,7 @@ class ProductModel {
     String? name,
     double? price,
     String? imageUrl,
+    List<String>? images,
     String? shopId,
     String? category,
     String? description,
@@ -162,13 +179,16 @@ class ProductModel {
     int? viewsCount, // ✅ ЖАҢЫ
     int? likesCount, // ✅ ЖАҢЫ
     bool? hasNegotiation,
-
+    String? pricingType,
+    String? wholesaleMode,
+    double? wholesalePrice,
   }) {
     return ProductModel(
       id: id ?? this.id,
       name: name ?? this.name,
       price: price ?? this.price,
       imageUrl: imageUrl ?? this.imageUrl,
+      images: images ?? this.images,
       shopId: shopId ?? this.shopId,
       category: category ?? this.category,
       description: description ?? this.description,
@@ -190,7 +210,9 @@ class ProductModel {
       viewsCount: viewsCount ?? this.viewsCount, // ✅ ЖАҢЫ
       likesCount: likesCount ?? this.likesCount,
       hasNegotiation: hasNegotiation ?? this.hasNegotiation,
-       // ✅ ЖАҢЫ
+      pricingType: pricingType ?? this.pricingType,
+      wholesaleMode: wholesaleMode ?? this.wholesaleMode,
+      wholesalePrice: wholesalePrice ?? this.wholesalePrice,
     );
   }
 }

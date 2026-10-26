@@ -4,6 +4,7 @@ import '../../../config/theme/app_text_styles.dart';
 import '../../../core/app_localizations.dart';
 import '../models/seller_model.dart';
 import '../services/seller_service.dart';
+
 import 'seller_product_screen.dart';
 import '../../chat/screens/chat_list_screen.dart';
 import '../../chat/services/chat_service.dart';
@@ -15,6 +16,9 @@ import 'seller_close_account_screen.dart';
 import '../widgets/working_hours_sheet.dart';
 import 'seller_rules_screen.dart';
 import 'seller_edit_profile_screen.dart';
+import '../../chat/models/chat_model.dart';
+import 'seller_notifications_screen.dart';
+import 'seller_admin_chat_banner.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   final String uid;
@@ -577,6 +581,10 @@ const SizedBox(height: 20),
                 ]),
               ),
 
+              // ── Админден билдирүүлөр ──
+            SellerAdminChatBanner(isDark: isDark, sellerUid: _seller!.uid),
+const SizedBox(height: 16),
+
               SizedBox(
                 width: double.infinity, height: 50,
                 child: OutlinedButton(
@@ -657,73 +665,92 @@ const SizedBox(height: 20),
   // }
 
   Widget _buildChatMenuItem(AppLocalizations loc, Color cardBg) {
-    return StreamBuilder<List>(
-      stream: _chatService.sellerChatsStream(_seller!.uid),
-      builder: (context, snap) {
-        final isDark      = Theme.of(context).brightness == Brightness.dark;
-        final chats       = snap.data ?? [];
-        final totalUnread = chats.fold<int>(0, (sum, chat) => sum + ((chat as dynamic).sellerUnread as int));
-        final titleColor  = isDark ? Colors.white : AppColors.black;
+  return StreamBuilder<List<ChatModel>>(
+    stream: _chatService.sellerChatsStream(_seller!.uid),
+    builder: (context, snap) {
+      final isDark      = Theme.of(context).brightness == Brightness.dark;
+      final chats       = snap.data ?? [];
+    final totalUnread = chats.fold<int>(
+  0, (sum, chat) => sum + (chat.sellerUnread as num).toInt(),
+);
+      final titleColor = isDark ? Colors.white : AppColors.black;
 
-        return GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ChatListScreen(isSeller: true, sellerId: _seller!.uid))),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Row(children: [
-              Stack(clipBehavior: Clip.none, children: [
-                const Text('💬', style: TextStyle(fontSize: 28)),
-                if (totalUnread > 0)
-                  Positioned(
-                    top: -6, right: -8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white, width: 1.5),
+      return GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => ChatListScreen(isSeller: true, sellerId: _seller!.uid))),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            )],
+          ),
+          child: Row(children: [
+            Stack(clipBehavior: Clip.none, children: [
+              const Text('💬', style: TextStyle(fontSize: 28)),
+              if (totalUnread > 0)
+                Positioned(
+                  top: -6, right: -8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Text(
+                      totalUnread > 99 ? '99+' : '$totalUnread',
+                      style: const TextStyle(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold,
                       ),
-                      child: Text(totalUnread > 99 ? '99+' : '$totalUnread',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-              ]),
-              const SizedBox(width: 14),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Text(loc.get('dash_messages'),
-                      style: AppTextStyles.labelLarge.copyWith(color: titleColor)),
-                  if (totalUnread > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(10)),
-                      child: Text('$totalUnread ${loc.get('dash_new')}',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ]),
-                const SizedBox(height: 2),
-                Text(
-                  totalUnread > 0 ? '$totalUnread ${loc.get('dash_unread')}' : loc.get('dash_chat_with_customers'),
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: totalUnread > 0 ? AppColors.error : AppColors.grey500,
-                    fontWeight: totalUnread > 0 ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
-              ])),
-              const Icon(Icons.arrow_forward_ios, color: AppColors.grey400, size: 16),
             ]),
-          ),
-        );
-      },
-    );
-  }
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(loc.get('dash_messages'),
+                    style: AppTextStyles.labelLarge.copyWith(color: titleColor)),
+                if (totalUnread > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$totalUnread ${loc.get('dash_new')}',
+                      style: const TextStyle(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ]),
+              const SizedBox(height: 2),
+              Text(
+                totalUnread > 0
+                    ? '$totalUnread ${loc.get('dash_unread')}'
+                    : loc.get('dash_chat_with_customers'),
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: totalUnread > 0 ? AppColors.error : AppColors.grey500,
+                  fontWeight: totalUnread > 0 ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ])),
+            const Icon(Icons.arrow_forward_ios, color: AppColors.grey400, size: 16),
+          ]),
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildMenuItem(BuildContext context, {
     required String icon,
@@ -754,6 +781,174 @@ const SizedBox(height: 20),
           ])),
           const Icon(Icons.arrow_forward_ios, color: AppColors.grey400, size: 16),
         ]),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// Админден билдирүүлөр банери (Dashboard астында)
+// ══════════════════════════════════════════════════════
+class _AdminNotificationsBanner extends StatefulWidget {
+  final bool isDark;
+  final String sellerUid;
+  const _AdminNotificationsBanner({required this.isDark, required this.sellerUid});
+
+  @override
+  State<_AdminNotificationsBanner> createState() =>
+      _AdminNotificationsBannerState();
+}
+
+class _AdminNotificationsBannerState
+    extends State<_AdminNotificationsBanner> {
+  int _count = 0;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCount();
+  }
+
+  Future<void> _loadCount() async {
+    try {
+      final rows = await supabase
+          .from('admin_notifications')
+          .select('id')
+          .or('seller_id.is.null,seller_id.eq.${widget.sellerUid}')
+          .order('created_at', ascending: false);
+      if (mounted) {
+        setState(() {
+          _count = (rows as List).length;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final isRu = AppLocalizations.of(context).locale.languageCode == 'ru';
+    final cardBg = isDark ? const Color(0xFF1E1A2E) : const Color(0xFFFFF8F0);
+    final borderColor = const Color(0xFFD97706).withValues(alpha: isDark ? 0.4 : 0.35);
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => SellerNotificationsScreen(sellerUid: widget.sellerUid)),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor),
+          boxShadow: isDark
+              ? []
+              : [
+                  BoxShadow(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            // Иконка
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD97706), Color(0xFFEF4444)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.campaign_rounded,
+                      color: Colors.white, size: 22),
+                ),
+                if (_loaded && _count > 0)
+                  Positioned(
+                    top: -5,
+                    right: -5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF1E1A2E)
+                                : const Color(0xFFFFF8F0),
+                            width: 1.5),
+                      ),
+                      child: Text(
+                        '$_count',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 14),
+
+            // Текст
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isRu ? 'Уведомления от администратора' : 'Админден билдирүүлөр',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _loaded && _count > 0
+                        ? (isRu ? 'Есть $_count уведомлений' : '$_count билдирүү бар')
+                        : (isRu ? 'Читайте новые уведомления здесь' : 'Жаңы билдирүүлөрдү бул жерден окуңуз'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.grey500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Жебе
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Color(0xFFD97706),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

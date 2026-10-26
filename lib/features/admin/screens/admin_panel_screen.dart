@@ -5,12 +5,14 @@ import '../../../core/supabase_client.dart';
 import '../../seller/models/seller_model.dart';
 import '../../seller/services/seller_service.dart';
 import '../../seller/services/subscription_service.dart';
+import 'admin_chat_with_seller.dart';
 import '../../map/screens/admin_map_picker_screen.dart';
 import 'admin_stats_screen.dart';
 import 'admin_story_manager_screen.dart';
 import 'admin_seller_stats_screen.dart';
 import 'admin_phone_requests_screen.dart';
 import '../widgets/admin_notification_sender.dart';
+import 'admin_complaints_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -35,6 +37,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
+  // Билдирүүлөр издөө
+  final _notifSearchCtrl = TextEditingController();
+  String _notifQuery = '';
+
   String? _adminCardMasked;
   // ignore: unused_field
   String? _adminCardToken;
@@ -49,12 +55,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.toLowerCase().trim());
     });
+    _notifSearchCtrl.addListener(() {
+      setState(() => _notifQuery = _notifSearchCtrl.text.toLowerCase().trim());
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchCtrl.dispose();
+    _notifSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -985,18 +995,54 @@ GestureDetector(
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-             children: [
-  _buildPendingTab(),
-  _buildApprovedTab(),
-  _buildAllTab(),
-  _buildProductsTab(),
-  _buildPaymentsTab(),
- const AdminPhoneRequestsScreen(), 
-  _buildNotificationsTab(),   // ← ЖАҢ
- 
-],
+          : Stack(
+              children: [
+                TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPendingTab(),
+                    _buildApprovedTab(),
+                    _buildAllTab(),
+                    _buildProductsTab(),
+                    _buildPaymentsTab(),
+                    const AdminPhoneRequestsScreen(),
+                    _buildNotificationsTab(),
+                  ],
+                ),
+
+                // ── Оң астынкы — Арыздар + Сатуучуга жазуу FAB ──
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      FloatingActionButton.extended(
+                        heroTag: 'complaints',
+                        onPressed: () => _openComplaintsPanel(),
+                        backgroundColor: const Color(0xFFEF4444),
+                        icon: const Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+                        label: const Text(
+                          'Арыздар',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      FloatingActionButton.extended(
+                        heroTag: 'send_to_seller',
+                        onPressed: () => showAdminChatSheet(context, _allSellers),
+                        backgroundColor: const Color(0xFFD97706),
+                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                        label: const Text(
+                          'Сатуучуга',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1020,14 +1066,126 @@ GestureDetector(
     );
   }
 
+  // ── Арыздар панели ──
+  void _openComplaintsPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollCtrl) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+          return Container(
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF3A3A3A) : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.flag_rounded,
+                            color: Color(0xFFEF4444), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Арыздар',
+                        style: AppTextStyles.headingMedium.copyWith(
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Expanded(child: AdminComplaintsScreen()),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Сатуучуга билдирүү жөнөтүү ──
+
   // ══════════════════════════════════════════════════════
   // ⏳ ӨТҮНҮЧТӨР TAB
   // ══════════════════════════════════════════════════════
 
 Widget _buildNotificationsTab() {
-  return const SingleChildScrollView(
-    padding: EdgeInsets.only(top: 12, bottom: 32),
-    child: AdminNotificationSender(),
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final fillColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5);
+  final textColor = isDark ? Colors.white : AppColors.black;
+
+  return Column(
+    children: [
+      // ── Издөө ──
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: TextField(
+          controller: _notifSearchCtrl,
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            hintText: 'Билдирүүлөрдөн издөө...',
+            hintStyle: TextStyle(color: AppColors.grey400),
+            prefixIcon: Icon(Icons.search_rounded, color: AppColors.grey400),
+            suffixIcon: _notifQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    color: AppColors.grey400,
+                    onPressed: () {
+                      _notifSearchCtrl.clear();
+                      setState(() => _notifQuery = '');
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: fillColor,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+          ),
+        ),
+      ),
+
+      // ── Билдирүүлөр тизмеси ──
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 32),
+          child: AdminNotificationSender(searchQuery: _notifQuery),
+        ),
+      ),
+    ],
   );
 }
 
@@ -1914,25 +2072,137 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
   List<Map<String, dynamic>> _suggestions = [];
   bool _loading = true;
 
+  // Тандоо режими (белгилеп өчүрүү үчүн)
+  bool _selectMode = false;
+  final Set<String> _selected = {};
+
+  // Sheet ичинде snackbar көрүнүшү үчүн өзүнчө messenger
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  String _idOf(Map<String, dynamic> s) => s['id'].toString();
+
   Future<void> _load() async {
-    final rows = await supabase
-        .from('buyer_suggestions')
-        .select()
-        .order('created_at', ascending: false);
-    if (mounted) {
+    try {
+      final rows = await supabase
+          .from('buyer_suggestions')
+          .select()
+          .order('created_at', ascending: false);
+      if (!mounted) return;
       setState(() {
         _suggestions = (rows as List)
             .map((r) => Map<String, dynamic>.from(r as Map))
             .toList();
+        _selected.removeWhere((id) => !_suggestions.any((s) => _idOf(s) == id));
         _loading = false;
       });
+    } catch (e) {
+      debugPrint('❌ _SuggestionsPanelSheet._load: $e');
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    (_messengerKey.currentState ?? ScaffoldMessenger.of(context)).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: error ? AppColors.error : AppColors.success,
+      ),
+    );
+  }
+
+  Future<void> _markRead(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      await supabase
+          .from('buyer_suggestions')
+          .update({'is_read': true}).inFilter('id', ids);
+      if (!mounted) return;
+      setState(() {
+        for (final s in _suggestions) {
+          if (ids.contains(_idOf(s))) s['is_read'] = true;
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ suggestions markRead: $e');
+      _snack('Ката: $e', error: true);
+    }
+  }
+
+  Future<void> _delete(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Өчүрүү', style: AppTextStyles.headingSmall),
+        content: Text(
+          ids.length == 1
+              ? 'Бул билдирүүнү өчүрөсүзбү?'
+              : '${ids.length} билдирүүнү өчүрөсүзбү?',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Жок', style: TextStyle(color: AppColors.grey500)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Өчүрүү', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      final deleted = await supabase
+          .from('buyer_suggestions')
+          .delete()
+          .inFilter('id', ids)
+          .select('id');
+      if (deleted.isEmpty) {
+        _snack(
+          'Өчүрүлгөн жок. Supabase\'де SQL миграцияны (delete уруксаты) иштетиңиз.',
+          error: true,
+        );
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _suggestions.removeWhere((s) => ids.contains(_idOf(s)));
+        _selected.removeAll(ids);
+        if (_selected.isEmpty) _selectMode = false;
+      });
+      _snack('Өчүрүлдү: ${deleted.length}');
+    } catch (e) {
+      debugPrint('❌ suggestions delete: $e');
+      _snack('Ката: $e', error: true);
+    }
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selected.clear();
+    });
   }
 
   String _typeLabel(String? type) {
@@ -1944,6 +2214,218 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
     }
   }
 
+  Widget _buildHeader() {
+    final allIds = _suggestions.map(_idOf).toList();
+    final allSelected = allIds.isNotEmpty && allIds.every(_selected.contains);
+    final unread =
+        _suggestions.where((s) => !(s['is_read'] as bool? ?? false)).length;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 8, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E40AF),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: _selectMode
+          ? Row(
+              children: [
+                IconButton(
+                  tooltip: 'Жабуу',
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: _exitSelectMode,
+                ),
+                Expanded(
+                  child: Text(
+                    'Тандалды: ${_selected.length}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: allSelected ? 'Тандоону алып салуу' : 'Баарын тандоо',
+                  icon: Icon(allSelected ? Icons.deselect : Icons.select_all,
+                      color: Colors.white),
+                  onPressed: () => setState(() {
+                    if (allSelected) {
+                      _selected.clear();
+                    } else {
+                      _selected.addAll(allIds);
+                    }
+                  }),
+                ),
+                IconButton(
+                  tooltip: 'Окулду деп белгилөө',
+                  icon: Icon(Icons.done_all_rounded,
+                      color: _selected.isEmpty ? Colors.white38 : Colors.white),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => _markRead(_selected.toList()),
+                ),
+                IconButton(
+                  tooltip: 'Өчүрүү',
+                  icon: Icon(Icons.delete_outline_rounded,
+                      color: _selected.isEmpty
+                          ? Colors.white38
+                          : const Color(0xFFFCA5A5)),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () => _delete(_selected.toList()),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Text('💬', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    unread > 0
+                        ? 'Кардарлар билдирүүлөрү ($unread жаңы)'
+                        : 'Кардарлар билдирүүлөрү',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Тандоо',
+                  icon: const Icon(Icons.checklist_rounded, color: Colors.white),
+                  onPressed: _suggestions.isEmpty
+                      ? null
+                      : () => setState(() => _selectMode = true),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white70),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildItem(Map<String, dynamic> s) {
+    final id = _idOf(s);
+    final isRead = s['is_read'] as bool? ?? false;
+    final isSelected = _selected.contains(id);
+    final time = DateTime.tryParse(s['created_at'] as String? ?? '')?.toLocal();
+    final timeStr = time != null
+        ? '${time.day}/${time.month} ${time.hour}:${time.minute.toString().padLeft(2, '0')}'
+        : '';
+
+    return GestureDetector(
+      onTap: () {
+        if (_selectMode) {
+          _toggle(id);
+        } else if (!isRead) {
+          _markRead([id]);
+        }
+      },
+      onLongPress: () {
+        if (!_selectMode) {
+          setState(() {
+            _selectMode = true;
+            _selected.add(id);
+          });
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF1E40AF).withValues(alpha: 0.35)
+              : const Color(0xFF334155),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? Colors.lightBlueAccent
+                : (isRead ? Colors.transparent : Colors.greenAccent.withValues(alpha: 0.6)),
+            width: isSelected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_selectMode) ...[
+              Checkbox(
+                value: isSelected,
+                activeColor: Colors.lightBlueAccent,
+                side: const BorderSide(color: Colors.white54),
+                onChanged: (_) => _toggle(id),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _typeLabel(s['type'] as String?),
+                          style: const TextStyle(
+                              color: Colors.lightBlue, fontSize: 11),
+                        ),
+                      ),
+                      if (!isRead) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('Жаңы',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                      const Spacer(),
+                      Text(timeStr,
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                      if (!_selectMode)
+                        InkWell(
+                          onTap: () => _delete([id]),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.delete_outline_rounded,
+                                color: Color(0xFFFCA5A5), size: 20),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('👤 ${s['user_name'] ?? 'Белгисиз'}',
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(s['message'] as String? ?? '',
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 14)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1952,94 +2434,453 @@ class _SuggestionsPanelSheetState extends State<_SuggestionsPanelSheet> {
         color: Color(0xFF1E293B),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E40AF),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Row(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: ScaffoldMessenger(
+          key: _messengerKey,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Column(
               children: [
-                const Text('💬', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text('Кардарлар билдирүүлөрү',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold)),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.white70),
+                _buildHeader(),
+                Expanded(
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.white))
+                      : _suggestions.isEmpty
+                          ? const Center(
+                              child: Text('Билдирүү жок',
+                                  style: TextStyle(color: Colors.white54)))
+                          : RefreshIndicator(
+                              onRefresh: _load,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(12),
+                                itemCount: _suggestions.length,
+                                itemBuilder: (_, i) => _buildItem(_suggestions[i]),
+                              ),
+                            ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : _suggestions.isEmpty
-                    ? const Center(
-                        child: Text('Билдирүү жок',
-                            style: TextStyle(color: Colors.white54)))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _suggestions.length,
-                        itemBuilder: (_, i) {
-                          final s = _suggestions[i];
-                          final time = DateTime.tryParse(s['created_at'] as String? ?? '');
-                          final timeStr = time != null
-                              ? '${time.day}/${time.month} ${time.hour}:${time.minute.toString().padLeft(2, '0')}'
-                              : '';
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF334155),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _typeLabel(s['type'] as String?),
-                                        style: const TextStyle(
-                                            color: Colors.lightBlue, fontSize: 11),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(timeStr,
-                                        style: const TextStyle(
-                                            color: Colors.white38, fontSize: 11)),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text('👤 ${s['user_name'] ?? 'Белгисиз'}',
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12)),
-                                const SizedBox(height: 4),
-                                Text(s['message'] as String? ?? '',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 14)),
-                              ],
-                            ),
-                          );
-                        },
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// Сатуучуну тандоо + Билдирүү жөнөтүү
+// ══════════════════════════════════════════════════════
+class _SendToSellerSheet extends StatefulWidget {
+  final List<SellerModel> sellers;
+  const _SendToSellerSheet({required this.sellers});
+
+  @override
+  State<_SendToSellerSheet> createState() => _SendToSellerSheetState();
+}
+
+class _SendToSellerSheetState extends State<_SendToSellerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  List<SellerModel> get _filtered {
+    if (_query.isEmpty) return widget.sellers;
+    final q = _query.toLowerCase();
+    return widget.sellers.where((s) =>
+        s.shopName.toLowerCase().contains(q) ||
+        s.name.toLowerCase().contains(q) ||
+        s.containerNumber.toLowerCase().contains(q)).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openCompose(SellerModel seller) {
+    Navigator.pop(context); // sheet'ти жап
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ComposeMessageSheet(seller: seller),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final fillColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5);
+    final textColor = isDark ? Colors.white : AppColors.black;
+    final subColor = isDark ? Colors.white60 : AppColors.grey500;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Башлык
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD97706), Color(0xFFEF4444)],
                       ),
-          ),
-        ],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.send_rounded,
+                        color: Colors.white, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Сатуучуну тандаңыз',
+                    style: AppTextStyles.headingSmall.copyWith(color: textColor),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close, color: subColor),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Издөө
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: TextField(
+                controller: _searchCtrl,
+                style: TextStyle(color: textColor),
+                onChanged: (v) => setState(() => _query = v.trim()),
+                decoration: InputDecoration(
+                  hintText: 'Дүкөн аты, ысым же контейнер...',
+                  hintStyle: TextStyle(color: AppColors.grey400),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: AppColors.grey400),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          color: AppColors.grey400,
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: fillColor,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            // Тизме
+            Expanded(
+              child: _filtered.isEmpty
+                  ? Center(
+                      child: Text('Табылган жок',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: subColor)),
+                    )
+                  : ListView.builder(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      itemCount: _filtered.length,
+                      itemBuilder: (_, i) {
+                        final s = _filtered[i];
+                        return ListTile(
+                          onTap: () => _openCompose(s),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFFD97706)
+                                .withValues(alpha: 0.15),
+                            child: Text(
+                              s.shopName.isNotEmpty
+                                  ? s.shopName[0].toUpperCase()
+                                  : '🏪',
+                              style: const TextStyle(
+                                  color: Color(0xFFD97706),
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(s.shopName,
+                              style: AppTextStyles.labelLarge
+                                  .copyWith(color: textColor)),
+                          subtitle: Text(
+                            '${s.name}  •  ${s.containerNumber}',
+                            style: AppTextStyles.labelSmall
+                                .copyWith(color: subColor),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.grey400,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// Билдирүү жазуу жана жөнөтүү
+// ══════════════════════════════════════════════════════
+class _ComposeMessageSheet extends StatefulWidget {
+  final SellerModel seller;
+  const _ComposeMessageSheet({required this.seller});
+
+  @override
+  State<_ComposeMessageSheet> createState() => _ComposeMessageSheetState();
+}
+
+class _ComposeMessageSheetState extends State<_ComposeMessageSheet> {
+  final _titleCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty || body.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Аталыш жана текст жазыңыз'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await supabase.from('admin_notifications').insert({
+        'title': title,
+        'body': body,
+        'seller_id': widget.seller.uid,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ ${widget.seller.shopName} дүкөнүнө жөнөтүлдү'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Ката: $e'),
+          backgroundColor: AppColors.error,
+        ));
+        setState(() => _sending = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final fillColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5);
+    final textColor = isDark ? Colors.white : AppColors.black;
+    final subColor = isDark ? Colors.white60 : AppColors.grey500;
+    final labelColor = isDark ? Colors.white70 : AppColors.grey600;
+
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Башлык
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor:
+                      const Color(0xFFD97706).withValues(alpha: 0.15),
+                  child: Text(
+                    widget.seller.shopName.isNotEmpty
+                        ? widget.seller.shopName[0].toUpperCase()
+                        : '🏪',
+                    style: const TextStyle(
+                        color: Color(0xFFD97706),
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.seller.shopName,
+                        style: AppTextStyles.labelLarge
+                            .copyWith(color: textColor)),
+                    Text(widget.seller.containerNumber,
+                        style: AppTextStyles.labelSmall
+                            .copyWith(color: subColor)),
+                  ],
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.close, color: subColor),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Аталышы
+            Text('Аталышы',
+                style: AppTextStyles.labelMedium
+                    .copyWith(color: labelColor)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _titleCtrl,
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                hintText: 'Мис: Маанилүү маалымат',
+                hintStyle: TextStyle(color: AppColors.grey400),
+                filled: true,
+                fillColor: fillColor,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Текст
+            Text('Билдирүү',
+                style: AppTextStyles.labelMedium
+                    .copyWith(color: labelColor)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _bodyCtrl,
+              maxLines: 4,
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                hintText: '${widget.seller.shopName} дүкөнүнө кат жазыңыз...',
+                hintStyle: TextStyle(color: AppColors.grey400),
+                filled: true,
+                fillColor: fillColor,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Жөнөт
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _sending ? null : _send,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  disabledBackgroundColor: AppColors.grey300,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                icon: _sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded,
+                        color: Colors.white, size: 18),
+                label: Text(
+                  _sending ? 'Жөнөтүлүүдө...' : 'Жөнөт',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
